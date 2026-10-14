@@ -79,6 +79,10 @@ jobs:
 
       - name: 按钉住的 commit 起 vcpkg
         shell: bash
+        env:
+          # 不压住它，bootstrap 会打印一行 "ignoring mismatched VCPKG_ROOT"（指的是 VS 自带那棵树），
+          # 混在日志里看着像出了事 —— 它用的是检测到的那棵，行为本身是对的。
+          VCPKG_ROOT: ${{ env.PLUGINS_VCPKG }}
         run: |
           git config --global core.longpaths true
           if [ ! -d "$PLUGINS_VCPKG/.git" ]; then git clone https://github.com/microsoft/vcpkg "$PLUGINS_VCPKG"; fi
@@ -106,11 +110,23 @@ jobs:
 
       - name: 验 Qt 就是宿主那一份版本
         shell: bash
+        env:
+          VCPKG_ROOT: ${{ env.PLUGINS_VCPKG }}
         run: |
           # 版本对不上就是"CI 编的插件不是本机测过的那份 Qt 编的"，别让它悄悄过去。
-          # vcpkg list 那一行长这样：`qtbase:x64-windows    6.10.2#3  C++ components of ...`
-          got="$("$PLUGINS_VCPKG/vcpkg.exe" list | grep -oE '^qtbase[^ ]*[[:space:]]+[0-9][0-9.]*' | grep -oE '[0-9][0-9.]*' | head -1)"
-          echo "vcpkg 里的 qtbase = $got（要求 $QT_MUST_BE）"
+          # 那一行长这样（列之间是补对齐的空格，端口修订号跟在 # 后面）：
+          #   qtbase:x64-windows            6.10.2            Qt Base (Core, Gui, Widgets, ...)
+          # 版本就是第二列，用 awk 取字段。**别拿 grep -o 抠数字** —— 上一版就是那么写的，
+          # 从第一列的 x64-windows 里抠出了「64」，把一次正常装好的 6.10.2 判成版本不对（CI 实测红的就是这条）。
+          # 那个 tr 是去掉 CRLF 里的 \r：vcpkg.exe 在 git-bash 下输出的是 Windows 行尾，
+          # 不去掉的话它跟在版本号后面，比较永远不相等。
+          raw="$("$PLUGINS_VCPKG/vcpkg.exe" list | tr -d '\r' | awk '/^qtbase:/{print $2; exit}')"
+          got="${raw%%#*}"
+          echo "vcpkg 里的 qtbase = [$got]（要求 $QT_MUST_BE）"
+          if [ -z "$got" ]; then
+            echo "::error::vcpkg list 里没有 qtbase 那一行 —— 上一步的装依赖其实没装上，先看那一步的日志"
+            exit 1
+          fi
           if [ "$got" != "$QT_MUST_BE" ]; then
             echo "::error::qtbase 是 $got 不是 $QT_MUST_BE —— 要改就改 PLUGINS_VCPKG_SHA（对齐本机那棵树），别改这里"
             exit 1
