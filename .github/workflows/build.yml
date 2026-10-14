@@ -1,0 +1,89 @@
+name: Build plugins
+
+# 编出 12 个 ltool-<id>.dll + 一份 dist/index.json（ltool 的插件商店读的就是它）。
+#
+# 和主仓库那份 CI 的差别：这里**不装 vcpkg、不从源码编 qtbase**。插件只要 Qt6 的头和导入库，
+# Qt6 用官方预编译包（install-qt-action，分钟级）—— 主仓库那份要编 qtbase 是因为它还要
+# LibArchive/bit7z 和一整套 core，这里不需要，等一小时没意义。
+#
+# Qt 版本钉 6.10.2，和主仓库 vcpkg.json 里那条 overrides 的 qtbase 版本**必须同一个数**：
+# 插件 dll 运行期加载的是宿主那一份 Qt6*.dll，版本不一致就是加载失败或崩在两边的堆上。
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "p*"
+  workflow_dispatch:
+
+concurrency:
+  group: plugins-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: "6.10.2"
+  SDK_API: "3"
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      # sdk/ 是主仓库 tools/make_sdk.py 生成的快照（core 公开的头 + ltoolcore.lib + 那半份构建函数）。
+      # core 不在这里编，所以先验这份快照在不在、接口对不对 —— 别看半天链接错误再回头找原因。
+      - name: 验 SDK 快照
+        shell: pwsh
+        run: |
+          $need = @('include/ltool-plugin.h','include/core-api.h','include/Utils.h',
+                    'lib/ltoolcore.lib','ltool-plugin.cmake','INFO.txt')
+          $bad = @($need | Where-Object { -not (Test-Path "sdk/$_") })
+          if ($bad.Count -gt 0) { Write-Output "sdk/ 缺：$($bad -join ', ')"; exit 1 }
+          $api = (Select-String -Path sdk/include/ltool-plugin.h -Pattern 'LTOOL_PLUGIN_API_VERSION (\d+)').Matches[0].Groups[1].Value
+          if ($api -ne $env:SDK_API) { Write-Output "sdk/ 那份接口是 API $api，本仓库按 API $env:SDK_API 编 —— 去主仓库重跑 tools/make_sdk.py 更新 sdk/"; exit 1 }
+          $n = @(Get-ChildItem sdk/include -Filter *.h).Count
+          $kb = [int]((Get-Item sdk/lib/ltoolcore.lib).Length / 1KB)
+          Write-Output "sdk/ 在位：API $api，$n 个头 + $kb KB 导入库"
+
+      - name: 装 Qt（官方预编译，分钟级）
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2019_64
+          aqtversion: '==3.*'
+
+      - name: 配置
+        shell: pwsh
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
+          exit $LASTEXITCODE
+
+      - name: 编 12 个 dll
+        shell: pwsh
+        run: |
+          cmake --build build --config Release -j
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # 一个都不许缺：漏一个，商店里那张卡就永远"下载失败"，宁可在构建这一步就红
+          $want = @(Get-ChildItem plugins -Directory | ForEach-Object { "ltool-$($_.Name).dll" })
+          $have = @(Get-ChildItem build/plugins/*.dll | ForEach-Object { $_.Name })
+          $miss = @($want | Where-Object { $have -notcontains $_ })
+          if ($miss.Count -gt 0) { Write-Output "缺产物：$($miss -join ', ')"; exit 1 }
+          Write-Output "编出 $($have.Count) 个：$($have -join ' ')"
+
+      - name: 生成 index.json（每 dll 的 SHA256 从产物现算）
+        shell: pwsh
+        run: |
+          python tools/make_index.py --build build/plugins --src plugins `
+            --out dist/index.json --sdk-info sdk/INFO.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content dist/index.json -TotalCount 14
+
+      # 只验不发布：商店那份 dist/ 现在直接提交在本仓库 main 上（raw 地址就能下），
+      # 所以这条 CI 的职责是"改了源码必须还能编、还得齐"，产物留成 artifact 供人核对。
+      # 要把 dist/ 也自动更新回仓库、或者改成发 Release，那是**对外动作**，由人点头之后再加。
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugins-${{ github.sha }}
+          path: |
+            build/plugins/*.dll
+            dist/index.json

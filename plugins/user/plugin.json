@@ -1,0 +1,16 @@
+{
+ "Id": "user",
+ "Name": "Windows 用户名",
+ "Desc": "看清自己是哪个账户，改显示名或改账户名（都要管理员授权）",
+ "Api": 3,
+ "Keywords": [
+  "用户名",
+  "账户",
+  "改名",
+  "user",
+  "username",
+  "account",
+  "fullname"
+ ],
+ "Color": "120,90,200"
+}

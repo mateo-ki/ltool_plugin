@@ -1,0 +1,17 @@
+{
+ "Id": "record",
+ "Name": "录屏",
+ "Desc": "按 F2 录整块屏幕或某一个窗口，出 mp4（画质/画面两档可选）",
+ "Api": 3,
+ "Keywords": [
+  "录屏",
+  "录像",
+  "screen",
+  "record",
+  "f2"
+ ],
+ "Actions": [
+  "record"
+ ],
+ "Color": "219,72,160"
+}

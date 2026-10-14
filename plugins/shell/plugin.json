@@ -1,0 +1,24 @@
+{
+ "Id": "shell",
+ "Name": "右键动作",
+ "Desc": "占用分析 / 谁占用着它 / 粉碎 / 解压 / 压缩为 zip·7z",
+ "Api": 3,
+ "Keywords": [
+  "解压",
+  "压缩",
+  "粉碎",
+  "占用",
+  "右键",
+  "shell"
+ ],
+ "Actions": [
+  "fileinfo",
+  "whohas",
+  "shred",
+  "extract",
+  "extract-sub",
+  "compress-zip",
+  "compress-7z"
+ ],
+ "Color": "203,110,52"
+}

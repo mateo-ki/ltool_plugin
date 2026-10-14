@@ -1,0 +1,17 @@
+{
+ "Id": "repair",
+ "Name": "DLL 修复",
+ "Desc": "检测微软运行库 / DirectX / .NET，缺什么补什么",
+ "Api": 3,
+ "Keywords": [
+  "dll",
+  "运行库",
+  "vc++",
+  "vcruntime",
+  "修复",
+  "directx",
+  "dotnet",
+  "net"
+ ],
+ "Color": "214,69,69"
+}

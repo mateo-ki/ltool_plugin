@@ -1,0 +1,24 @@
+ltool 插件 SDK —— 独立编一个 ltool-<id>.dll 要的那一份
+
+来自 ltool 0.9.0-beta.1（插件接口 API 3）
+ltoolcore.lib 的 SHA256：681a700f1429ed9618a17c37751f8325ea5addc90569b4475b3d861901d7d462
+头文件清单是 plugins/ 里真实 include 的那些求出来的传递闭包（15 个）：
+  AdBlocker.h
+  Archives.h
+  CaptureHistory.h
+  DevEnv.h
+  DiskScan.h
+  FileOps.h
+  FileTools.h
+  InfoRow.h
+  RegClean.h
+  ShellMenu.h
+  SilentInstallLog.h
+  StartupAudit.h
+  Utils.h
+  core-api.h
+  ltool-plugin.h
+onnxruntime 头：4 个（截图插件的 OCR 用，运行时不链接）
+
+这份是**快照**：主仓库改了 core 的导出面，就得重新跑 tools/make_sdk.py 更新它，
+否则插件里出现"链接找不到符号"或装上去加载失败。ltool-plugin.cmake 里写明了怎么校验。

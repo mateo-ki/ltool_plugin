@@ -1,0 +1,254 @@
+{
+ "schema": 1,
+ "core": "来自 ltool 0.9.0-beta.1（插件接口 API 3）",
+ "plugins": [
+  {
+   "id": "ads",
+   "name": "广告弹窗",
+   "desc": "扫描并拦截桌面广告弹窗，白名单与拦截规则",
+   "api": 3,
+   "keywords": [
+    "广告",
+    "弹窗",
+    "ad",
+    "拦截",
+    "广告弹窗"
+   ],
+   "actions": [],
+   "color": "136,87,229",
+   "file": "ltool-ads.dll",
+   "bytes": 95232,
+   "sha256": "d24119330bec15510cd7c52e969aa43dee2a1a527d7ef03628833ad8f03cc57d",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-ads.dll"
+  },
+  {
+   "id": "base64",
+   "name": "Base64 编解码",
+   "desc": "文本/图片互转，解不出合法 UTF-8 时给十六进制",
+   "api": 3,
+   "keywords": [
+    "base64",
+    "b64",
+    "编码",
+    "解码"
+   ],
+   "actions": [],
+   "color": "190,130,60",
+   "file": "ltool-base64.dll",
+   "bytes": 69632,
+   "sha256": "91b88b981d70e3ff3fb6acf76cb3a36a36ed3b65e1dfb795e2f5b39329d7f03b",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-base64.dll"
+  },
+  {
+   "id": "capture",
+   "name": "截图",
+   "desc": "按 F1 全屏截图：框选/窗口吸附/标注，再置顶、取字（OCR 首次用要下一趟引擎）",
+   "api": 3,
+   "keywords": [
+    "截图",
+    "截屏",
+    "标注",
+    "置顶",
+    "提取文字",
+    "ocr",
+    "capture",
+    "f1"
+   ],
+   "actions": [
+    "capture"
+   ],
+   "color": "52,152,219",
+   "file": "ltool-capture.dll",
+   "bytes": 354304,
+   "sha256": "77f929a772e5b60acea48d94f5ff8f544a11318d533e94fe6e4f499c6d734b52",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-capture.dll"
+  },
+  {
+   "id": "disk",
+   "name": "磁盘清理",
+   "desc": "可清理位置 + 所选盘的占用分析（矩形树图）",
+   "api": 3,
+   "keywords": [
+    "磁盘",
+    "清理",
+    "占用",
+    "空间",
+    "c盘",
+    "disk"
+   ],
+   "actions": [],
+   "color": "87,160,40",
+   "file": "ltool-disk.dll",
+   "bytes": 170496,
+   "sha256": "b2beeb68cf146c91afe39d73593ebbe4e47b21bf21f17a40d136a314d1e0b5e0",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-disk.dll"
+  },
+  {
+   "id": "json",
+   "name": "JSON 格式化",
+   "desc": "可折叠树 + 自动换行，文本区可直接改",
+   "api": 3,
+   "keywords": [
+    "json",
+    "格式化",
+    "json格式化"
+   ],
+   "actions": [],
+   "color": "90,140,220",
+   "file": "ltool-json.dll",
+   "bytes": 80896,
+   "sha256": "514dd2a028a9d728193a91abbfde78875ce0619ca2d18a359c4cdf6bc0c28693",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-json.dll"
+  },
+  {
+   "id": "network",
+   "name": "网络",
+   "desc": "系统代理检测、代理方案对比与内置下载设置",
+   "api": 3,
+   "keywords": [
+    "网络",
+    "代理",
+    "proxy"
+   ],
+   "actions": [],
+   "color": "0,150,199",
+   "file": "ltool-network.dll",
+   "bytes": 102912,
+   "sha256": "145f4dee71656ee643ace6b01a58a93a6373e4b9802d24fa8f75e2c1e894bf87",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-network.dll"
+  },
+  {
+   "id": "record",
+   "name": "录屏",
+   "desc": "按 F2 录整块屏幕或某一个窗口，出 mp4（画质/画面两档可选）",
+   "api": 3,
+   "keywords": [
+    "录屏",
+    "录像",
+    "screen",
+    "record",
+    "f2"
+   ],
+   "actions": [
+    "record"
+   ],
+   "color": "219,72,160",
+   "file": "ltool-record.dll",
+   "bytes": 256000,
+   "sha256": "061331bd60258a516603e2d4a8106ac354f06c4bc5f4c7b2b3f3a6b914095df7",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-record.dll"
+  },
+  {
+   "id": "registry",
+   "name": "注册表分析",
+   "desc": "扫失效路径与 9x 遗留键：卸载残留 / 启动项 / 关联 / COM / 服务 / 死盘符",
+   "api": 3,
+   "keywords": [
+    "注册表",
+    "registry",
+    "reg",
+    "残留",
+    "废弃",
+    "失效"
+   ],
+   "actions": [],
+   "color": "150,100,60",
+   "file": "ltool-registry.dll",
+   "bytes": 96768,
+   "sha256": "40c6d07a59cc618772699d520ad12a82946377ef362d960f012c6a6103e7e76e",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-registry.dll"
+  },
+  {
+   "id": "repair",
+   "name": "DLL 修复",
+   "desc": "检测微软运行库 / DirectX / .NET，缺什么补什么",
+   "api": 3,
+   "keywords": [
+    "dll",
+    "运行库",
+    "vc++",
+    "vcruntime",
+    "修复",
+    "directx",
+    "dotnet",
+    "net"
+   ],
+   "actions": [],
+   "color": "214,69,69",
+   "file": "ltool-repair.dll",
+   "bytes": 90112,
+   "sha256": "1ab92b739e38e3a450ea94390ac870ae8ca435b2535d4cc46837e0a5f4973652",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-repair.dll"
+  },
+  {
+   "id": "shell",
+   "name": "右键动作",
+   "desc": "占用分析 / 谁占用着它 / 粉碎 / 解压 / 压缩为 zip·7z",
+   "api": 3,
+   "keywords": [
+    "解压",
+    "压缩",
+    "粉碎",
+    "占用",
+    "右键",
+    "shell"
+   ],
+   "actions": [
+    "fileinfo",
+    "whohas",
+    "shred",
+    "extract",
+    "extract-sub",
+    "compress-zip",
+    "compress-7z"
+   ],
+   "color": "203,110,52",
+   "file": "ltool-shell.dll",
+   "bytes": 141312,
+   "sha256": "7bc2b1a76ed09767b2539685d2eb2b606715ada8eab63e2deddd680f2f493820",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-shell.dll"
+  },
+  {
+   "id": "startup",
+   "name": "开机启动分析",
+   "desc": "开机后都有什么自己起来 · 谁家的 · 哪些该管哪些不用管",
+   "api": 3,
+   "keywords": [
+    "启动",
+    "开机",
+    "自启",
+    "startup",
+    "autostart",
+    "服务",
+    "计划任务"
+   ],
+   "actions": [],
+   "color": "60,140,120",
+   "file": "ltool-startup.dll",
+   "bytes": 99840,
+   "sha256": "3de098a0ee97f3a1f91baa83d2f698747a92e5668bc5d51d55a0d5dbbe6b6c1d",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-startup.dll"
+  },
+  {
+   "id": "user",
+   "name": "Windows 用户名",
+   "desc": "看清自己是哪个账户，改显示名或改账户名（都要管理员授权）",
+   "api": 3,
+   "keywords": [
+    "用户名",
+    "账户",
+    "改名",
+    "user",
+    "username",
+    "account",
+    "fullname"
+   ],
+   "actions": [],
+   "color": "120,90,200",
+   "file": "ltool-user.dll",
+   "bytes": 124416,
+   "sha256": "7c75b34cf06eb88f661edf52b8a5e3a687f44824d64447c0b5acf0a71118dd12",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-user.dll"
+  }
+ ]
+}
