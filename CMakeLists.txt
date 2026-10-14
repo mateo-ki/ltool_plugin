@@ -6,9 +6,13 @@ project(ltool-plugins LANGUAGES CXX)
 # 加上 sdk/ —— 那是主仓库 tools/make_sdk.py 生成的一份快照（core 公开头 + ltoolcore.lib +
 # 那半份构建函数），没有它这里链不出 dll（插件用的是 core 那一份 Utils/InfoRow/Archive，不是复制）。
 #
-# 本地怎么编（Windows，需要 MSVC + Qt6）：
-#   cmake -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH=<Qt6 所在>
-#   cmake --build build --config Release
+# 本地怎么编（Windows，需要 MSVC + Qt6 6.10.2）：
+#   走 vcpkg（和 CI 同一条路，classic 模式装 qtbase）：
+#     cmake -B build -G "Visual Studio 17 2022" -A x64 \
+#       -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+#   或者 Qt 已经在别处（官方包/自己编的）：
+#     cmake -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH=<Qt6 所在>
+#   两支都要再：cmake --build build --config Release
 #   → build/plugins/ltool-<id>.dll，拷到 ltool.exe 旁边的 ltool-plugins\ 里就生效
 # 或者只编一个：cmake --build build --config Release --target ltool-json
 
@@ -33,12 +37,10 @@ foreach(d ${pluginDirs})
         continue()
     endif()
     get_filename_component(id ${d} NAME)
-    # 类名按约定推：<首字母大写的 id>Plugin（repair→RepairPlugin、base64→Base64Plugin、
-    # json→JsonPlugin…）。约定而不是表：表会和插件自己漂移，而插件的 CLASS_NAME 在源码里只有一处。
-
     add_subdirectory(${d} ${CMAKE_BINARY_DIR}/build-${id})
-    set_target_properties(ltool-${id} PROPERTIES
-        LTOOL_PLUGIN_CLASS "${clsBase}Plugin")
+    # 类名在各自 plugins/<id>/CMakeLists.txt 里显式给（ltool_add_plugin(<id> <CLASS> …)），
+    # 这里只收集 target 名给下面的 index 目标当依赖。
+    list(APPEND pluginTargets ltool-${id})
 endforeach()
 
 # ---- index.json：插件商店那一面读的就是它 ----

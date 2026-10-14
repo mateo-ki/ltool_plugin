@@ -1,13 +1,18 @@
 name: Build plugins
 
-# 编出 12 个 ltool-<id>.dll + 一份 dist/index.json（ltool 的插件商店读的就是它）。
+# 编出 12 个 ltool-<id>.dll + 一份 dist/index.json（ltool 的插件商店读的就是这份）。
+# 这条流水线的**源在本仓库 plugin-ci/build.yml**，插件仓库（https://github.com/mateo-ki/ltool_plugin）
+# 的 .github/workflows/build.yml 是它的副本 —— 改这里，再连同 ci/annotate-fail.sh 一起拷过去提交。
 #
-# 和主仓库那份 CI 的差别：这里**不装 vcpkg、不从源码编 qtbase**。插件只要 Qt6 的头和导入库，
-# Qt6 用官方预编译包（install-qt-action，分钟级）—— 主仓库那份要编 qtbase 是因为它还要
-# LibArchive/bit7z 和一整套 core，这里不需要，等一小时没意义。
-#
-# Qt 版本钉 6.10.2，和主仓库 vcpkg.json 里那条 overrides 的 qtbase 版本**必须同一个数**：
-# 插件 dll 运行期加载的是宿主那一份 Qt6*.dll，版本不一致就是加载失败或崩在两边的堆上。
+# 依赖装法照 D:\project\cpp\vcc 那份 CI：**vcpkg classic 模式 + 显式端口清单**，
+# 并把 vcpkg 自己钉在一个 commit 上。为什么不用官方预编译 Qt（install-qt-action）——
+# 这条路 2026-10-15 实测走不通：Qt 6.10.2 在在线安装器的 windows_x86/desktop 归档里没有
+# Updates.xml（`qt6_6102/` 是个空目录，只有 `qt6_610` 那份在，而那套的架构名是
+# win64_msvc2019_64 / win64_mingw81），aqt 于是报
+# "The packages ['qt_base'] were not found while parsing XML of package information!"。
+# 更根本的理由：宿主那份 Qt 本来就是 vcpkg 编出来的，插件用同一个端口装才叫同源；
+# 官方预编译包和 vcpkg 打包的 Qt 混着用，出事的是运行期的加载。
+
 on:
   push:
     branches:
@@ -16,74 +21,213 @@ on:
       - "p*"
   workflow_dispatch:
 
+# 同一个 ref 只留最新一次：连推几次 main，后面那次把前面还在跑的顶掉。
+# 装依赖是小时级的，堆四五个作业排队等于最后一个要再等一小时以上才出结果。
 concurrency:
   group: plugins-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  QT_VERSION: "6.10.2"
-  SDK_API: "3"
+  # 故意不叫 VCPKG_ROOT：ilammy/msvc-dev-cmd 会导出 VCPKG_ROOT 指向 VS 自带那份 vcpkg，
+  # 后面用到它的步骤会静默换成系统树（vcc 那边踩过）。需要时按步骤把 VCPKG_ROOT 压回去。
+  #
+  # 而且必须放在工作区内：actions/cache 对工作区之外的路径**静默不保存**，
+  # 放外面等于每次 run 都重编一遍 Qt（约一小时）。
+  PLUGINS_VCPKG: ${{ github.workspace }}/.ci/vcpkg
+  # 钉的是**本机那棵 vcpkg 树所在的 commit**（`git -C D:/vcpkg log -1 --format=%H`），
+  # 不是"某人上次编辑这一行时的 tip"。它和主仓库 vcpkg.json 里的 builtin-baseline 同一个号：
+  # 两边 qtbase 版本必须一样，否则 CI 编出来的插件不是本机测过的那份 Qt 编的。
+  PLUGINS_VCPKG_SHA: e64546260d40765da00e64390b19fcade13f3986
+  # 插件只要 Qt6 的 Core/Gui/Widgets/Network/Concurrent，全在 qtbase 这一个端口里。
+  # 不要 libarchive / bit7z —— 那两个是 core 的实现依赖，插件调的是 core 封好的 Archive::。
+  VCPKG_PORTS: qtbase
+  QT_MUST_BE: "6.10.2"
+  # 二进制缓存：源之间用 ';'，一个源**内部**用 ','。写成 `files;<路径>;readwrite`
+  # 会把 readwrite 当路径读，整步报 "binary config 'files' requires at least one path argument"。
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
 
 jobs:
   windows:
     runs-on: windows-2022
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      actions: write      # vcpkg 的 x-gha 二进制缓存要写
     steps:
       - uses: actions/checkout@v4
+
+      - name: 给 vcpkg 的 x-gha 缓存导出凭据
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: 缓存 vcpkg 树和它下载的压缩包
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PLUGINS_VCPKG }}
+            ${{ github.workspace }}/.ci/vcpkg-cache
+          key: vcpkg-classic-${{ runner.os }}-${{ env.PLUGINS_VCPKG_SHA }}-${{ env.VCPKG_PORTS }}
+          # 加一个端口就换主键；没有这条前缀回退，那等于再编一小时 Qt
+          restore-keys: |
+            vcpkg-classic-${{ runner.os }}-${{ env.PLUGINS_VCPKG_SHA }}
+
+      - name: 把 MSVC / CMake 摆上 PATH
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: 按钉住的 commit 起 vcpkg
+        shell: bash
+        run: |
+          git config --global core.longpaths true
+          if [ ! -d "$PLUGINS_VCPKG/.git" ]; then git clone https://github.com/microsoft/vcpkg "$PLUGINS_VCPKG"; fi
+          # classic 模式不需要 baseline，所以拉不到那个对象时退回 tip 继续跑，不为这个红整条作业
+          # （退回之后 Qt 版本可能对不上 —— 下一步会硬验，不会悄悄过去）
+          if git -C "$PLUGINS_VCPKG" fetch --depth 1 origin "$PLUGINS_VCPKG_SHA"; then
+            git -C "$PLUGINS_VCPKG" checkout --detach "$PLUGINS_VCPKG_SHA"
+          else
+            echo "::warning::拉不到 vcpkg $PLUGINS_VCPKG_SHA，改用分支 tip"
+          fi
+          "$PLUGINS_VCPKG/bootstrap-vcpkg.bat" -disableMetrics
+
+      - name: 装依赖
+        shell: bash
+        env:
+          VCPKG_ROOT: ${{ env.PLUGINS_VCPKG }}   # 压过 msvc-dev-cmd 写进 GITHUB_ENV 的那份
+        run: |
+          set +e
+          "$PLUGINS_VCPKG/vcpkg.exe" version
+          "$PLUGINS_VCPKG/vcpkg.exe" install --triplet x64-windows $VCPKG_PORTS > install.log 2>&1
+          status=$?
+          tail -n 40 install.log
+          sh ci/annotate-fail.sh "$status" "vcpkg install" install.log
+          exit $status
+
+      - name: 验 Qt 就是宿主那一份版本
+        shell: bash
+        run: |
+          # 版本对不上就是"CI 编的插件不是本机测过的那份 Qt 编的"，别让它悄悄过去。
+          # vcpkg list 那一行长这样：`qtbase:x64-windows    6.10.2#3  C++ components of ...`
+          got="$("$PLUGINS_VCPKG/vcpkg.exe" list | grep -oE '^qtbase[^ ]*[[:space:]]+[0-9][0-9.]*' | grep -oE '[0-9][0-9.]*' | head -1)"
+          echo "vcpkg 里的 qtbase = $got（要求 $QT_MUST_BE）"
+          if [ "$got" != "$QT_MUST_BE" ]; then
+            echo "::error::qtbase 是 $got 不是 $QT_MUST_BE —— 要改就改 PLUGINS_VCPKG_SHA（对齐本机那棵树），别改这里"
+            exit 1
+          fi
 
       # sdk/ 是主仓库 tools/make_sdk.py 生成的快照（core 公开的头 + ltoolcore.lib + 那半份构建函数）。
       # core 不在这里编，所以先验这份快照在不在、接口对不对 —— 别看半天链接错误再回头找原因。
       - name: 验 SDK 快照
-        shell: pwsh
+        shell: bash
         run: |
-          $need = @('include/ltool-plugin.h','include/core-api.h','include/Utils.h',
-                    'lib/ltoolcore.lib','ltool-plugin.cmake','INFO.txt')
-          $bad = @($need | Where-Object { -not (Test-Path "sdk/$_") })
-          if ($bad.Count -gt 0) { Write-Output "sdk/ 缺：$($bad -join ', ')"; exit 1 }
-          $api = (Select-String -Path sdk/include/ltool-plugin.h -Pattern 'LTOOL_PLUGIN_API_VERSION (\d+)').Matches[0].Groups[1].Value
-          if ($api -ne $env:SDK_API) { Write-Output "sdk/ 那份接口是 API $api，本仓库按 API $env:SDK_API 编 —— 去主仓库重跑 tools/make_sdk.py 更新 sdk/"; exit 1 }
-          $n = @(Get-ChildItem sdk/include -Filter *.h).Count
-          $kb = [int]((Get-Item sdk/lib/ltoolcore.lib).Length / 1KB)
-          Write-Output "sdk/ 在位：API $api，$n 个头 + $kb KB 导入库"
+          for f in include/ltool-plugin.h include/core-api.h include/Utils.h lib/ltoolcore.lib ltool-plugin.cmake INFO.txt; do
+            test -f "sdk/$f" || { echo "::error::sdk/ 缺 $f —— 回主仓库跑 tools/make_sdk.py 重新生成"; exit 1; }
+          done
+          api="$(grep -oE 'LTOOL_PLUGIN_API_VERSION +[0-9]+' sdk/include/ltool-plugin.h | grep -oE '[0-9]+$')"
+          if [ "$api" != "3" ]; then
+            echo "::error::sdk/ 那份接口是 API $api，本仓库按 API 3 编 —— 同样是要更新 sdk/"
+            exit 1
+          fi
+          echo "sdk/ 在位：API $api，$(ls sdk/include/*.h | wc -l) 个头，导入库 $(( $(wc -c < sdk/lib/ltoolcore.lib) / 1024 )) KB"
 
-      - name: 装 Qt（官方预编译，分钟级）
-        uses: jurplel/install-qt-action@v4
+      - name: 装 Python（校验 dist/ 和生成 index.json 都要用）
+        uses: actions/setup-python@v5
         with:
-          version: ${{ env.QT_VERSION }}
-          arch: win64_msvc2019_64
-          aqtversion: '==3.*'
+          python-version: "3.11"
 
-      - name: 配置
-        shell: pwsh
+      # 商店装之前是**按 index.json 里那个 sha256 校验下载到的 dll** 的。dist/ 里那份清单和那 12 个
+      # dll 一旦不同源（重编了 dll 忘了重算清单，或反之），症状是"每个插件都下载失败"，
+      # 而现场只会看到一句哈希不符 —— 所以在编之前先把这份自洽性验掉（秒级，不用等一小时）。
+      - name: 验 dist/ 那份清单和 dll 对得上
+        shell: bash
         run: |
-          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
-          exit $LASTEXITCODE
+          python - <<'PY'
+          import hashlib, json, os, sys
+          idx = json.load(open('dist/index.json', encoding='utf-8'))
+          bad = []
+          for p in idx['plugins']:
+              f = os.path.join('dist', p['file'])
+              if not os.path.isfile(f):
+                  bad.append(f"{p['id']}: dist/ 里没有 {p['file']}")
+                  continue
+              h = hashlib.sha256()
+              with open(f, 'rb') as fh:
+                  for blk in iter(lambda: fh.read(1 << 20), b''):
+                      h.update(blk)
+              if h.hexdigest() != p['sha256']:
+                  bad.append(f"{p['id']}: 哈希对不上（清单 {p['sha256'][:12]}… ≠ 文件 {h.hexdigest()[:12]}…）")
+              elif os.path.getsize(f) != p['bytes']:
+                  bad.append(f"{p['id']}: 字节数对不上（清单 {p['bytes']} ≠ 文件 {os.path.getsize(f)}）")
+          if bad:
+              print('::error::dist/index.json 与 dist/*.dll 不同源 —— 重跑 tools/make_index.py 并把两份一起提交')
+              print('\n'.join('  ' + b for b in bad))
+              sys.exit(1)
+          print(f"dist/ 自洽：{len(idx['plugins'])} 个插件的 sha256 与字节数逐个对上")
+          PY
 
-      - name: 编 12 个 dll
-        shell: pwsh
+      # 生成器钉 **Visual Studio 17 2022 多配置**，不用 Ninja：SDK 那份 ltool-plugin.cmake 把 dll
+      # 落在 `RUNTIME_OUTPUT_DIRECTORY_RELEASE`，单配置生成器不认这个属性，Ninja 编出来的 12 个 dll
+      # 会散在各插件自己的 build-<id> 目录里 —— 配置能过、下一步「一个 dll 都不许缺」当场扑空。
+      # 2026-10-15 本机按这条命令串跑通过：configure + build 全绿，build-ci/plugins 整 12 个。
+      - name: 配置并编出 12 个 dll
+        shell: bash
+        env:
+          VCPKG_ROOT: ${{ env.PLUGINS_VCPKG }}
         run: |
-          cmake --build build --config Release -j
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # 一个都不许缺：漏一个，商店里那张卡就永远"下载失败"，宁可在构建这一步就红
-          $want = @(Get-ChildItem plugins -Directory | ForEach-Object { "ltool-$($_.Name).dll" })
-          $have = @(Get-ChildItem build/plugins/*.dll | ForEach-Object { $_.Name })
-          $miss = @($want | Where-Object { $have -notcontains $_ })
-          if ($miss.Count -gt 0) { Write-Output "缺产物：$($miss -join ', ')"; exit 1 }
-          Write-Output "编出 $($have.Count) 个：$($have -join ' ')"
+          set +e
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 \
+            -DCMAKE_TOOLCHAIN_FILE="$PLUGINS_VCPKG/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-windows > configure.log 2>&1
+          status=$?
+          if [ $status -eq 0 ]; then
+            cmake --build build --config Release --parallel 8 > build.log 2>&1
+            status=$?
+          fi
+          tail -n 40 configure.log
+          tail -n 40 build.log 2>/dev/null || true
+          sh ci/annotate-fail.sh "$status" "build" build.log
+          exit $status
+
+      - name: 一个 dll 都不许缺
+        shell: bash
+        run: |
+          # 漏一个，商店里那张卡就永远"下载失败"，所以宁可在构建这一步就红
+          miss=""
+          for d in plugins/*/; do
+            id="$(basename "$d")"
+            test -f "build/plugins/ltool-$id.dll" || miss="$miss ltool-$id.dll"
+          done
+          if [ -n "$miss" ]; then echo "::error::缺产物：$miss"; exit 1; fi
+          ls -l build/plugins/ltool-*.dll | awk '{print $5, $9}'
 
       - name: 生成 index.json（每 dll 的 SHA256 从产物现算）
-        shell: pwsh
+        shell: bash
         run: |
-          python tools/make_index.py --build build/plugins --src plugins `
-            --out dist/index.json --sdk-info sdk/INFO.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-Content dist/index.json -TotalCount 14
+          set -e
+          python tools/make_index.py --build build/plugins --src plugins \
+            --out dist/index.json --sdk-info sdk/INFO.txt \
+            --base-url "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/dist"
+          head -c 400 dist/index.json
 
-      # 只验不发布：商店那份 dist/ 现在直接提交在本仓库 main 上（raw 地址就能下），
+      # 只验不发布：商店那份 dist/ 现在直接提交在本仓库 main 上（raw 地址免登录就能下），
       # 所以这条 CI 的职责是"改了源码必须还能编、还得齐"，产物留成 artifact 供人核对。
-      # 要把 dist/ 也自动更新回仓库、或者改成发 Release，那是**对外动作**，由人点头之后再加。
+      # 要把 dist/ 自动更新回仓库、或者改成发 Release，那是**对外动作**，由人点头之后再加。
       - uses: actions/upload-artifact@v4
         with:
-          name: plugins-${{ github.sha }}
+          name: ltool-plugins-${{ github.sha }}
           path: |
-            build/plugins/*.dll
+            build/plugins/ltool-*.dll
             dist/index.json
+          if-no-files-found: error
+
+      - name: 失败时把各段日志留成 artifact
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-build-logs
+          path: |
+            install.log
+            configure.log
+            build.log

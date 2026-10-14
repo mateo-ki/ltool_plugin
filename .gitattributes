@@ -1,0 +1,5 @@
+# CI 里 `sh ci/annotate-fail.sh` 是用 bash 跑的：CRLF 会让 \r 混进 `then`/`fi` 这些词里，
+# 报一句看不懂的语法错。Windows 上 git 默认会做 LF→CRLF 检出转换，这一行把它按住。
+*.sh text eol=lf
+*.yml text eol=lf
+*.py text eol=lf

@@ -3,3 +3,4 @@ CMakeUserPresets.json
 .vs/
 out/
 *.log
+build-*/

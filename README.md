@@ -11,12 +11,17 @@
 | `sdk/` | 主仓库 `tools/make_sdk.py` 生成的**快照**：core 公开的 15 个头 + `ltoolcore.lib`（导入库）+ `ltool-plugin.cmake` + `INFO.txt` |
 | `dist/` | 编好的 12 个 dll + `index.json`（插件商店读的就是它）；每 dll 的 SHA256 从产物现算 |
 | `tools/make_index.py` | 生成 `dist/index.json` |
-| `.github/workflows/build.yml` | CI：验 SDK → 装 Qt → 编 12 个 dll → 出 index.json → 存 artifact（**不自动发布**） |
+| `.github/workflows/build.yml` | CI：装依赖（vcpkg classic，只要 `qtbase`）→ 验 Qt 版本 → 验 SDK → 验 `dist/` 自洽 → 编 12 个 dll → 出 index.json → 存 artifact（**不自动发布**） |
 
 ## 本地编一个 dll
 
 ```
+# 走 vcpkg（和 CI 同一条路：classic 模式装好的那棵树）
+cmake -B build -G "Visual Studio 17 2022" -A x64 \
+  -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+# 或者 Qt 在别处（官方包/自己编的）
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=<Qt6 6.10.2 所在>
+
 cmake --build build --config Release            # 全部 12 个
 cmake --build build --config Release --target ltool-json   # 只编一个
 ```
@@ -66,8 +71,14 @@ cmake --build build --config Release --target ltool-json   # 只编一个
 回主仓库跑 `python tools/make_sdk.py <这份仓库>/sdk` 重新生成、提交。
 CI 第一步会验 `sdk/` 在不在、API 对不对，所以忘了更新不会拖到运行期。
 
-## 两条已知的坑（别指望它们不存在）
+## 三条已知的坑（别指望它们不存在）
 
 - **Qt 版本必须和主程序同一个数**（现在钉 6.10.2）。插件运行期加载的是宿主那份 `Qt6*.dll`，
-  对不上就是加载失败；CI 里那个 `QT_VERSION` 和主仓库 `vcpkg.json` 的 `overrides.qtbase` 必须一致。
+  对不上就是加载失败；CI 里 `QT_MUST_BE` 装的依赖、`PLUGINS_VCPKG_SHA` 钉的 vcpkg commit
+  和主仓库 `vcpkg.json` 的 `builtin-baseline`/`overrides.qtbase` 必须四者同源。
+  官方预编译 Qt（install-qt-action）这条路 2026-10-15 实测不通：在线安装器归档里 `qt6_6102/` 是空目录，
+  aqt 当场报 "The packages ['qt_base'] were not found"，所以现在改走 vcpkg —— 宿主那份 Qt 本来就是 vcpkg 编的。
+- **生成器必须是多配置（Visual Studio）**：`sdk/ltool-plugin.cmake` 把 dll 落在
+  `RUNTIME_OUTPUT_DIRECTORY_RELEASE`，单配置生成器（Ninja/Make）不认这个属性，产物会散进
+  `build-<id>/` 而不是 `build/plugins/`。
 - **本仓库的 CI 不自动发布**：只编、只出 artifact。把 `dist/` 更新回 main 或发 Release 是对外动作，由人按下。
