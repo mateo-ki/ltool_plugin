@@ -56,7 +56,8 @@ def main():
         name = 'ltool-%s.dll' % meta['Id']
         row = {'id': meta['Id'], 'name': meta['Name'], 'desc': meta['Desc'],
                'api': meta['Api'], 'keywords': meta.get('Keywords', []),
-               'actions': meta.get('Actions', []), 'color': meta.get('Color', ''),
+               'actions': meta.get('Actions', []),
+               'version': meta.get('Version', meta.get('version', '1.0.0')), 'color': meta.get('Color', ''),
                'file': name, 'bytes': os.path.getsize(dll), 'sha256': sha256(dll)}
         row['url'] = (a.base_url.rstrip('/') + '/' + name) if a.base_url else name
         out.append(row)
