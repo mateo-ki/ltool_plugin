@@ -42,6 +42,7 @@ QIcon cachedFileIcon(const QString& path);
 // 会卡在 DDE 握手上等回调（实测 729ms），启动器回车必须用这个。
 bool launch(const QString& path, const QString& params = {}, const QString& workingDir = {},
             bool async = false);
+bool launchAsAdmin(const QString& path, const QString& params = {}, const QString& workingDir = {});
 
 // 在资源管理器中定位文件
 void revealInExplorer(const QString& path);
@@ -65,6 +66,7 @@ QString fileVersion(const QString& exePath);
 
 // 圆角字母图标（菜单/占位图标共用）
 QIcon letterIcon(const QString& text, const QColor& color);
+QIcon bagIcon(const QColor& color);   // 菜单里「插件商店」那一行画的是一颗袋子，不是第一个字
 
 // 让系统立刻回收工作集（任务管理器里的"内存"立即下降）。
 // 注意：这会让下一次交互把所有页换回来，别在常驻的热键路径上用它

@@ -1,6 +1,6 @@
 name: Build plugins
 
-# 编出 12 个 ltool-<id>.dll + 一份 dist/index.json（ltool 的插件商店读的就是这份）。
+# 编出全部 ltool-<id>.dll + 一份 dist/index.json（ltool 的插件商店读的就是这份）。
 # 这条流水线的**源在本仓库 plugin-ci/build.yml**，插件仓库（https://github.com/mateo-ki/ltool_plugin）
 # 的 .github/workflows/build.yml 是它的副本 —— 改这里，再连同 ci/annotate-fail.sh 一起拷过去提交。
 #
@@ -202,7 +202,7 @@ jobs:
 
       # ---------------- 插件编译与打包 ----------------
       # 生成器钉 Visual Studio 17 2022 多配置
-      - name: 配置并编出 12 个 dll
+      - name: 配置并编译全部插件 dll
         shell: bash
         env:
           VCPKG_ROOT: ${{ env.PLUGINS_VCPKG }}

@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "core": "来自 ltool 0.9.0-beta.1（插件接口 API 3）",
+ "core": "来自 ltool 1.0.1（插件接口 API 3）",
  "plugins": [
   {
    "id": "ads",
@@ -15,12 +15,12 @@
     "广告弹窗"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "136,87,229",
    "file": "ltool-ads.dll",
    "bytes": 95232,
    "sha256": "d24119330bec15510cd7c52e969aa43dee2a1a527d7ef03628833ad8f03cc57d",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-ads.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-ads.dll"
   },
   {
    "id": "base64",
@@ -34,12 +34,12 @@
     "解码"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "190,130,60",
    "file": "ltool-base64.dll",
    "bytes": 69632,
    "sha256": "91b88b981d70e3ff3fb6acf76cb3a36a36ed3b65e1dfb795e2f5b39329d7f03b",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-base64.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-base64.dll"
   },
   {
    "id": "capture",
@@ -59,12 +59,12 @@
    "actions": [
     "capture"
    ],
+   "version": "1.0.0",
    "color": "52,152,219",
    "file": "ltool-capture.dll",
    "bytes": 354304,
    "sha256": "77f929a772e5b60acea48d94f5ff8f544a11318d533e94fe6e4f499c6d734b52",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-capture.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-capture.dll"
   },
   {
    "id": "disk",
@@ -80,12 +80,12 @@
     "disk"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "87,160,40",
    "file": "ltool-disk.dll",
    "bytes": 170496,
    "sha256": "b2beeb68cf146c91afe39d73593ebbe4e47b21bf21f17a40d136a314d1e0b5e0",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-disk.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-disk.dll"
   },
   {
    "id": "json",
@@ -98,12 +98,39 @@
     "json格式化"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "90,140,220",
    "file": "ltool-json.dll",
    "bytes": 80896,
    "sha256": "514dd2a028a9d728193a91abbfde78875ce0619ca2d18a359c4cdf6bc0c28693",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-json.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-json.dll"
+  },
+  {
+   "id": "language",
+   "name": "开发语言与环境",
+   "desc": "检测、安装并配置 Java、C++、Node.js、Python、Rust 等开发语言与环境",
+   "api": 3,
+   "keywords": [
+    "语言",
+    "环境",
+    "翻译",
+    "java",
+    "python",
+    "node",
+    "nodejs",
+    "rust",
+    "c++",
+    "cpp",
+    "winget",
+    "path"
+   ],
+   "actions": [],
+   "version": "1.0.0",
+   "color": "40,150,220",
+   "file": "ltool-language.dll",
+   "bytes": 178176,
+   "sha256": "9847f4605a19d957b3135905cc92a8c38fca6bcac2c49ded689b65b782de107e",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-language.dll"
   },
   {
    "id": "network",
@@ -116,12 +143,12 @@
     "proxy"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "0,150,199",
    "file": "ltool-network.dll",
    "bytes": 102912,
    "sha256": "145f4dee71656ee643ace6b01a58a93a6373e4b9802d24fa8f75e2c1e894bf87",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-network.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-network.dll"
   },
   {
    "id": "record",
@@ -138,12 +165,12 @@
    "actions": [
     "record"
    ],
+   "version": "1.0.0",
    "color": "219,72,160",
    "file": "ltool-record.dll",
    "bytes": 256000,
    "sha256": "061331bd60258a516603e2d4a8106ac354f06c4bc5f4c7b2b3f3a6b914095df7",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-record.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-record.dll"
   },
   {
    "id": "registry",
@@ -159,12 +186,12 @@
     "失效"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "150,100,60",
    "file": "ltool-registry.dll",
    "bytes": 96768,
    "sha256": "40c6d07a59cc618772699d520ad12a82946377ef362d960f012c6a6103e7e76e",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-registry.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-registry.dll"
   },
   {
    "id": "repair",
@@ -182,12 +209,12 @@
     "net"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "214,69,69",
    "file": "ltool-repair.dll",
    "bytes": 90112,
    "sha256": "1ab92b739e38e3a450ea94390ac870ae8ca435b2535d4cc46837e0a5f4973652",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-repair.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-repair.dll"
   },
   {
    "id": "shell",
@@ -211,12 +238,12 @@
     "compress-zip",
     "compress-7z"
    ],
+   "version": "1.0.0",
    "color": "203,110,52",
    "file": "ltool-shell.dll",
    "bytes": 141312,
    "sha256": "7bc2b1a76ed09767b2539685d2eb2b606715ada8eab63e2deddd680f2f493820",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-shell.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-shell.dll"
   },
   {
    "id": "startup",
@@ -233,12 +260,12 @@
     "计划任务"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "60,140,120",
    "file": "ltool-startup.dll",
    "bytes": 99840,
    "sha256": "3de098a0ee97f3a1f91baa83d2f698747a92e5668bc5d51d55a0d5dbbe6b6c1d",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-startup.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-startup.dll"
   },
   {
    "id": "user",
@@ -255,12 +282,12 @@
     "fullname"
    ],
    "actions": [],
+   "version": "1.0.0",
    "color": "120,90,200",
    "file": "ltool-user.dll",
    "bytes": 124416,
    "sha256": "7c75b34cf06eb88f661edf52b8a5e3a687f44824d64447c0b5acf0a71118dd12",
-   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-user.dll",
-   "version": "1.0.0"
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-user.dll"
   }
  ]
 }
