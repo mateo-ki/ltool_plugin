@@ -125,6 +125,33 @@
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-json.dll"
   },
   {
+   "id": "language",
+   "name": "开发语言与环境",
+   "desc": "检测、安装并配置 Java、C++、Node.js、Python、Rust 等开发语言与环境",
+   "api": 3,
+   "keywords": [
+    "语言",
+    "环境",
+    "翻译",
+    "java",
+    "python",
+    "node",
+    "nodejs",
+    "rust",
+    "c++",
+    "cpp",
+    "winget",
+    "path"
+   ],
+   "actions": [],
+   "version": "1.0.0",
+   "color": "40,150,220",
+   "file": "ltool-language.dll",
+   "bytes": 178176,
+   "sha256": "bcce1de7eda06e0aac3550d4470cbd003d7b4623ccc3f83d423b366126821a9e",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-language.dll"
+  },
+  {
    "id": "network",
    "name": "网络",
    "desc": "系统代理检测、代理方案对比与内置下载设置",

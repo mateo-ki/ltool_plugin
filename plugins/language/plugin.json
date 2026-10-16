@@ -1,0 +1,22 @@
+{
+ "Id": "language",
+ "Name": "开发语言与环境",
+ "Desc": "检测、安装并配置 Java、C++、Node.js、Python、Rust 等开发语言与环境",
+ "Api": 3,
+ "Version": "1.0.0",
+ "Keywords": [
+  "语言",
+  "环境",
+  "翻译",
+  "java",
+  "python",
+  "node",
+  "nodejs",
+  "rust",
+  "c++",
+  "cpp",
+  "winget",
+  "path"
+ ],
+ "Color": "40,150,220"
+}
