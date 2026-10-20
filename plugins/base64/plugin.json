@@ -2,8 +2,8 @@
  "Id": "base64",
  "Name": "Base64 编解码",
  "Desc": "文本/图片互转，解不出合法 UTF-8 时给十六进制",
- "Api": 3,
- "Version": "1.0.0",
+ "Api": 4,
+ "Version": "1.0.1",
  "Keywords": [
   "base64",
   "b64",

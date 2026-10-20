@@ -1,7 +1,9 @@
 #include "RecordUi.h"
+#include "platform/Launch.h"
 
 #include "Recorder.h"
 #include "Utils.h"
+#include "WindowPreview.h"
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -225,6 +227,8 @@ WindowPicker::WindowPicker(QWidget* parent)
     head->setSpacing(6);
     auto* title = new QLabel(QStringLiteral("录什么？（整块屏幕 / 某一个窗口）"), this);
     title->setStyleSheet("color:#e8ebf2;font-size:13px;font-weight:600;");
+    // 这窗没标题栏，"按住哪儿能挪"得写在人眼看得见的地方
+    title->setToolTip(QStringLiteral("按住这一行（或标题旁边的空白处）可以拖动这个窗"));
     // 这窗没标题栏，光靠 Esc / 点到别处 / 再按一次 F2 还是得有个人眼的落点
     m_close = new QPushButton(QStringLiteral("✕"), this);
     m_close->setObjectName(QStringLiteral("close"));
@@ -235,7 +239,8 @@ WindowPicker::WindowPicker(QWidget* parent)
     head->addStretch(1);
     head->addWidget(m_close);
     auto* filter = new QLineEdit(this);
-    filter->setPlaceholderText(QStringLiteral("输入关键字过滤（输「屏」就剩整块屏幕），回车开始录，Esc 取消"));
+    filter->setPlaceholderText(QStringLiteral("输入关键字过滤（输「屏」就剩整块屏幕）；"
+                                              "点一条只是选中并出预览，按「开始录制」或回车才开录，Esc 取消"));
     auto* list = new QListWidget(this);
     list->setSelectionMode(QAbstractItemView::SingleSelection);
     // 画质 / 画面大小：录之前顺手能改的两件事，改一下就记住（config.ini），下次按 F2 还是这个。
@@ -267,10 +272,50 @@ WindowPicker::WindowPicker(QWidget* parent)
     opts->addWidget(wCap);
     opts->addWidget(width);
     opts->addStretch(1);
+
+    // 「开始录制」：点条目只选中，开录要按这颗（或回车）。摆在最后一行的中间，
+    // 这一行其余的控件（画质/画面）都在左边，按钮在中间，右边留白把它顶出来。
+    m_rec = new QPushButton(QStringLiteral("开始录制"), this);
+    m_rec->setObjectName(QStringLiteral("recStart"));
+    m_rec->setCursor(Qt::PointingHandCursor);
+    m_rec->setMinimumWidth(120);
+    m_rec->setToolTip(QStringLiteral("录当前选中那一条（同回车）"));
+    auto* bottom = new QHBoxLayout;
+    bottom->setSpacing(6);
+    bottom->addLayout(opts);
+    bottom->addStretch(1);
+    bottom->addWidget(m_rec);
+    bottom->addStretch(1);
+    // 右边垫一块和左边那组一样宽的空白：这样按钮落在**整个窗的中线上**，
+    // 而不是"剩下那点空间的中间"（那样它永远偏右）。
+    auto* pad = new QWidget;
+    pad->setFixedWidth(opts->sizeHint().width());
+    bottom->addWidget(pad);
+
+    // 右边那一块实时预览：拿的就是 Recorder 同一一路（WGC），并且按当前「画面」档
+    // 缩到编码尺寸 —— 这块小图就是将要进 mp4 的那一张，不是另画一份示意图。
+    m_pv = new WindowPreview(this);
+    m_shot = new QLabel(QStringLiteral("没选东西"), this);
+    m_shot->setObjectName(QStringLiteral("preview"));
+    m_shot->setAlignment(Qt::AlignCenter);
+    m_shot->setMinimumSize(260, 196);
+    m_shot->setScaledContents(false);
+    m_cap = new QLabel(QStringLiteral("选中一条就能看到录进去的画面"), this);
+    m_cap->setObjectName(QStringLiteral("previewCap"));
+    m_cap->setWordWrap(true);
+    auto* right = new QVBoxLayout;
+    right->setSpacing(4);
+    right->addWidget(m_shot, 1);
+    right->addWidget(m_cap);
+    auto* mid = new QHBoxLayout;
+    mid->setSpacing(8);
+    mid->addWidget(list, 5);
+    mid->addLayout(right, 4);
+
     lay->addLayout(head);
     lay->addWidget(filter);
-    lay->addWidget(list, 1);
-    lay->addLayout(opts);
+    lay->addLayout(mid, 1);
+    lay->addLayout(bottom);
     list->setObjectName(QStringLiteral("list"));
     filter->setObjectName(QStringLiteral("filter"));
     setStyleSheet("QWidget{background:#26272c;border:1px solid #3a3c45;}"
@@ -284,7 +329,14 @@ WindowPicker::WindowPicker(QWidget* parent)
                   "QComboBox{background:#1b1c20;color:#e8ebf2;border:1px solid #3a3c45;"
                   "border-radius:5px;padding:3px 6px;}"
                   "QComboBox QAbstractItemView{background:#1b1c20;color:#e8ebf2;"
-                  "border:1px solid #3a3c45;selection-background-color:#3f6ae0;}");
+                  "border:1px solid #3a3c45;selection-background-color:#3f6ae0;}"
+                  "QLabel#preview{background:#101114;color:#8b93a1;border:1px solid #3a3c45;"
+                  "border-radius:6px;}"
+                  "QLabel#previewCap{background:transparent;border:none;color:#8b93a1;font-size:8.5pt;}"
+                  "QPushButton#recStart{background:#3f6ae0;color:#ffffff;font-weight:600;"
+                  "border:none;border-radius:5px;padding:6px 18px;}"
+                  "QPushButton#recStart:hover{background:#5a82f0;}"
+                  "QPushButton#recStart:disabled{background:#3a3d46;color:#8b93a1;}");
     connect(m_close, &QPushButton::clicked, this, &QWidget::hide);
     const auto saveOpts = [quality, width] {
         QSettings st(Utils::dataDir() + "/config.ini", QSettings::IniFormat);
@@ -299,8 +351,13 @@ WindowPicker::WindowPicker(QWidget* parent)
     // （quality 在创建时就按配置摆好，width 的匹配循环也在加进布局之前），
     // 所以初始化不会触发保存 —— 以后谁把回填挪到 connect 后面，就会每次按 F2 多写一遍配置。
     connect(quality, &QComboBox::currentIndexChanged, quality, [saveOpts](int) { saveOpts(); });
-    connect(width, &QComboBox::currentIndexChanged, width, [saveOpts](int) { saveOpts(); });
-    resize(460, 392);
+    // 「画面」那一档换掉时只改预览的缩放目标：编码尺寸是每帧现算的，不必重开取帧那一路
+    connect(width, &QComboBox::currentIndexChanged, this, [this, saveOpts](int) {
+        saveOpts();
+        m_pv->setMaxWidth(recMaxWidth());
+        refreshPreview();     // 那行字要跟着换（"编码后 1280x720"），图下一帧自己会来
+    });
+    resize(760, 430);
 
     const auto rebuild = [this, list, filter] {
         list->clear();
@@ -332,24 +389,34 @@ WindowPicker::WindowPicker(QWidget* parent)
         for (int i = 0; i < list->count(); ++i)
             list->item(i)->setHidden(!needle.isEmpty() && !list->item(i)->text().contains(needle, Qt::CaseInsensitive));
     });
-    const auto choose = [this, list] {
-        auto* it = list->currentItem();
-        if (!it)
-            return;
-        emit picked(WId(it->data(Qt::UserRole).toLongLong()), it->data(Qt::UserRole + 1).toString(),
-                    it->data(Qt::UserRole + 2).toBool());
-    };
-    connect(list, &QListWidget::itemActivated, this, [choose](QListWidgetItem*) { choose(); });
-    connect(filter, &QLineEdit::returnPressed, this, [this, choose] {
+    // 点条目**只选中**（顺带换预览），开录要按「开始录制」那颗或敲回车。
+    // 以前是 itemActivated（双击/回车）直接开录 —— 手一抖点两下就开始录了，而且没有任何
+    // 一步能反悔，也没有一处能看见"录进去的到底是这么大的一张图"。
+    connect(list, &QListWidget::currentRowChanged, this, [this](int) { refreshPreview(); });
+    connect(m_rec, &QPushButton::clicked, this, [this] { chooseCurrent(); });
+    connect(filter, &QLineEdit::returnPressed, this, [this] {
         // 回车先从可见项里挑第一个（"输入 Qoder 回车"就是录 Qoder）
-        auto* list = qobject_cast<QListWidget*>(m_list);
-        for (int i = 0; i < list->count(); ++i) {
-            if (!list->item(i)->isHidden()) {
-                list->setCurrentRow(i);
+        for (int i = 0; i < m_list->count(); ++i) {
+            if (!m_list->item(i)->isHidden()) {
+                m_list->setCurrentRow(i);
                 break;
             }
         }
-        choose();
+        chooseCurrent();
+    });
+    connect(m_pv, &WindowPreview::frameReady, this, [this] {
+        const QPixmap pm = m_pv->frame();
+        if (!pm.isNull()) {
+            m_shot->setPixmap(pm.scaled(m_shot->size() - QSize(10, 10), Qt::KeepAspectRatio,
+                                        Qt::SmoothTransformation));
+        }
+        const QString cap = m_pv->lastError().isEmpty()
+            ? QStringLiteral("编码后 %1x%2 · 采集 %3x%4 · 已取 %5 帧")
+                  .arg(m_pv->shownSize().width()).arg(m_pv->shownSize().height())
+                  .arg(m_pv->sourceSize().width()).arg(m_pv->sourceSize().height())
+                  .arg(m_pv->framesSeen())
+            : m_pv->lastError();
+        m_cap->setText(cap);
     });
 
     // Esc 要能从输入框和列表里也收得到：QLineEdit 会把 Esc 吃掉（它有自己的 escapePressed），
@@ -374,6 +441,14 @@ bool WindowPicker::eventFilter(QObject* watched, QEvent* e)
         hide();
         return true;
     }
+    if (watched == m_list && e->type() == QEvent::KeyPress) {
+        const int k = static_cast<QKeyEvent*>(e)->key();
+        if (k == Qt::Key_Return || k == Qt::Key_Enter) {
+            // 列表里按回车 = 按「开始录制」。条目本身不再因为双击开录了，键盘这条快路留着。
+            chooseCurrent();
+            return true;
+        }
+    }
     if (e->type() == QEvent::WindowDeactivate) {
         // 点到别处 = 不录了。这个窗是 activateWindow 过的，失焦就是用户真的走开了；
         // 不收起的话它会一直压在要录的那个窗口上面。
@@ -381,6 +456,77 @@ bool WindowPicker::eventFilter(QObject* watched, QEvent* e)
         return false;
     }
     return QWidget::eventFilter(watched, e);
+}
+
+void WindowPicker::chooseCurrent()
+{
+    auto* it = m_list ? m_list->currentItem() : nullptr;
+    if (!it || it->isHidden())
+        return;
+    emit picked(WId(it->data(Qt::UserRole).toLongLong()), it->data(Qt::UserRole + 1).toString(),
+                it->data(Qt::UserRole + 2).toBool());
+}
+
+void WindowPicker::refreshPreview()
+{
+    auto* it = m_list ? m_list->currentItem() : nullptr;
+    if (!isVisible() || !it || it->isHidden()) {
+        m_pv->stop();
+        m_shot->clear();
+        m_shot->setText(it ? QStringLiteral("这条看不见") : QStringLiteral("没选东西"));
+        m_cap->setText(QStringLiteral("选中一条就能看到录进去的画面"));
+        return;
+    }
+    m_pv->setMaxWidth(recMaxWidth());
+    QString err;
+    if (!m_pv->begin(WId(it->data(Qt::UserRole).toLongLong()),
+                     it->data(Qt::UserRole + 2).toBool(), &err)) {
+        m_shot->clear();
+        m_shot->setText(QStringLiteral("开不起预览"));
+        m_cap->setText(err);
+    } else {
+        m_shot->clear();
+        m_shot->setText(QStringLiteral("等第一帧…"));
+        m_cap->setText(QStringLiteral("编码后 %1")
+                           .arg(m_pv->shownSize().isValid() && m_pv->shownSize().width()
+                                    ? QStringLiteral("%1x%2")
+                                          .arg(m_pv->shownSize().width())
+                                          .arg(m_pv->shownSize().height())
+                                    : QStringLiteral("?")));
+    }
+}
+
+void WindowPicker::mousePressEvent(QMouseEvent* e)
+{
+    if (e->button() == Qt::LeftButton) {
+        m_dragging = true;
+        m_press = e->globalPosition().toPoint() - geometry().topLeft();
+    }
+}
+
+void WindowPicker::mouseMoveEvent(QMouseEvent* e)
+{
+    if (m_dragging && (e->buttons() & Qt::LeftButton))
+        move(e->globalPosition().toPoint() - m_press);
+}
+
+void WindowPicker::mouseReleaseEvent(QMouseEvent*)
+{
+    m_dragging = false;
+}
+
+void WindowPicker::showEvent(QShowEvent* e)
+{
+    QWidget::showEvent(e);
+    refreshPreview();
+}
+
+void WindowPicker::hideEvent(QHideEvent* e)
+{
+    // 收起来就把 WGC 那一路放掉：不放的话它一直在别人窗口上面抓帧，白烧 CPU，
+    // 而且紧接着 Recorder 要对同一个窗口再开一路，两路叠着没好处。
+    m_pv->stop();
+    QWidget::hideEvent(e);
 }
 
 // ---------------- 悬浮条 ----------------
@@ -503,7 +649,7 @@ void RecordBar::finish(const QString& error)
     disconnect(m_stop, nullptr, this, nullptr);
     connect(m_stop, &QPushButton::clicked, this, [this, error] {
         if (error.isEmpty())
-            Utils::revealInExplorer(m_path);
+            Platform::reveal(m_path);
         close();
     });
     auto* t = new QTimer(this);

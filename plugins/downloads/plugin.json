@@ -1,0 +1,13 @@
+{
+ "Id": "downloads",
+ "Name": "下载器",
+ "Desc": "多线程下载、断点续传与任务表",
+ "Api": 4,
+ "Version": "1.0.2",
+ "Keywords": [
+  "下载",
+  "download",
+  "http"
+ ],
+ "Color": "13,165,170"
+}

@@ -2,8 +2,8 @@
  "Id": "json",
  "Name": "JSON 格式化",
  "Desc": "可折叠树 + 自动换行，文本区可直接改",
- "Api": 3,
- "Version": "1.0.0",
+ "Api": 4,
+ "Version": "1.0.1",
  "Keywords": [
   "json",
   "格式化",

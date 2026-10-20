@@ -35,6 +35,7 @@
 #include "RecProbe.h"
 #include "Recorder.h"
 #include "RecordUi.h"
+#include "WindowPreview.h"
 #include "Utils.h"
 
 #include <QApplication>
@@ -52,6 +53,8 @@
 #include <QLabel>
 #include <QLayout>
 #include <QListWidget>
+#include <QLineEdit>
+#include <QMouseEvent>
 #include <QPixmap>
 #include <QPushButton>
 #include <QRandomGenerator>
@@ -607,6 +610,27 @@ extern "C" Q_DECL_EXPORT int ltoolRecorduiRun(int ms)
         return s.contains(QString::fromUtf8(needle)) ? QStringLiteral("yes") : QStringLiteral("no");
     };
 
+    // 目标窗口：右上角一张每 30ms 换一个数字的小卡，不抢焦点。
+    // 它建在选择窗**之前**：选择器那张列表是构造时枚举一次桌面的，卡片后建就根本不在列表里，
+    // 而预览那几条判据要的正是"选中一条 → 出帧"，所以顺序不能倒过来。
+    // 标题也给它起一个：visibleWindows() 不收没标题的窗口。
+    QWidget* card = new QWidget(nullptr, Qt::Window | Qt::FramelessWindowHint);
+    card->resize(360, 240);
+    card->setWindowTitle(QStringLiteral("ltool-rec-card"));
+    auto* lab = new QLabel(QStringLiteral("0"), card);
+    lab->setGeometry(0, 0, 360, 240);
+    lab->setAlignment(Qt::AlignCenter);
+    lab->setStyleSheet("background:#1d2026;color:#e8ebf2;font-size:30px;");
+    const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
+    card->move(avail.left() + 20, avail.top() + 20);
+    card->setAttribute(Qt::WA_ShowWithoutActivating);
+    card->show();
+    int tick = 0;
+    QTimer anim;
+    QObject::connect(&anim, &QTimer::timeout, card, [&] { lab->setText(QString::number(++tick)); });
+    anim.start(30);
+    QCoreApplication::processEvents();
+
     WindowPicker picker;
     auto* plist = picker.findChild<QListWidget*>(QStringLiteral("list"));
     // 新加的两颗下拉框（画质 / 画面）。这两条盯的是"改了到不到配置"：
@@ -715,22 +739,117 @@ extern "C" Q_DECL_EXPORT int ltoolRecorduiRun(int ms)
     check("第一条带屏幕标志", first && first->data(Qt::UserRole + 2).toBool() ? "yes" : "no", "yes");
     check("第二条是窗口（不带屏幕标志）", second && !second->data(Qt::UserRole + 2).toBool() ? "yes" : "no", "yes");
 
-    // 目标窗口：右上角一张每 30ms 换一个数字的小卡，不抢焦点
-    QWidget* card = new QWidget(nullptr, Qt::Window | Qt::FramelessWindowHint);
-    card->resize(360, 240);
-    auto* lab = new QLabel(QStringLiteral("0"), card);
-    lab->setGeometry(0, 0, 360, 240);
-    lab->setAlignment(Qt::AlignCenter);
-    lab->setStyleSheet("background:#1d2026;color:#e8ebf2;font-size:30px;");
-    const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
-    card->move(avail.left() + 20, avail.top() + 20);
-    card->setAttribute(Qt::WA_ShowWithoutActivating);
-    card->show();
-    int tick = 0;
-    QTimer anim;
-    QObject::connect(&anim, &QTimer::timeout, card, [&] { lab->setText(QString::number(++tick)); });
-    anim.start(30);
+    // ---- 这一轮新加的三件事：这个窗能拖动、选中一条就出预览、开录要按「开始录制」 ----
+    auto* recBtn = picker.startButton();
+    check("中间有「开始录制」那颗", recBtn && recBtn->text() == QStringLiteral("开始录制")
+              && recBtn->isVisibleTo(&picker) ? "yes" : "no", "yes");
+    check("「开始录制」真的摆在布局里", recBtn && inLayoutOf(&picker, recBtn) ? "yes" : "no", "yes");
+    auto* shot = picker.findChild<QLabel*>(QStringLiteral("preview"));
+    check("右边那块预览真的摆在布局里", shot && inLayoutOf(&picker, shot) ? "yes" : "no", "yes");
+
+    // 后面这几条要点条目、要拖窗、要拿帧，所以先把这个窗摆成"可见"：
+    // WA_DontShowOnScreen 让它走完布局和显示流程而不往屏幕上贴像素（不抢他的桌面）。
+    picker.setAttribute(Qt::WA_DontShowOnScreen, true);
+    picker.move(120, 120);
+    picker.show();
     QCoreApplication::processEvents();
+
+    int picks = 0;
+    WId pickedTarget = 0;
+    QObject::connect(&picker, &WindowPicker::picked, &picker,
+                     [&](WId target, const QString&, bool) { ++picks; pickedTarget = target; });
+    // 点一条 = 只选中：单击、双击都不许开录（以前双击直接开录，手一抖就录了一局）
+    const auto clickRow = [plist](int row, QEvent::Type pressType) {
+        QWidget* vp = plist->viewport();
+        const QPoint at = plist->visualItemRect(plist->item(row)).center();
+        const QPointF lp(at);
+        const QPointF gp(vp->mapToGlobal(at));
+        QMouseEvent press(pressType, lp, gp, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, lp, gp, Qt::LeftButton, Qt::NoButton,
+                            Qt::NoModifier);
+        QApplication::sendEvent(vp, &press);
+        QApplication::sendEvent(vp, &release);
+        QCoreApplication::processEvents();
+    };
+    plist->setCurrentRow(-1);
+    clickRow(1, QEvent::MouseButtonPress);
+    check("单击一条 = 只选中，没开录", QStringLiteral("%1/%2").arg(picks).arg(plist->currentRow()),
+          QStringLiteral("0/1"));
+    clickRow(1, QEvent::MouseButtonDblClick);
+    check("双击同一条也不开录（要按中间那颗）", QString::number(picks), "0");
+    recBtn->click();
+    check("按「开始录制」才开录，录的就是当前选中那条",
+          QStringLiteral("%1/%2").arg(picks)
+              .arg(pickedTarget == WId(plist->item(1)->data(Qt::UserRole).toLongLong()) ? 1 : 0),
+          QStringLiteral("1/1"));
+
+    // 没标题栏就得按住窗体自己拖。事件直接送给这个窗（不往他桌面上派）
+    const QPoint before = picker.pos();
+    const QPoint grab(picker.width() - 40, 12);        // 标题那一行右边的空白
+    const QPoint moved = grab + QPoint(60, 40);
+    const auto sendAt = [&](QEvent::Type ty, Qt::MouseButtons buttons, const QPoint& where) {
+        QMouseEvent e(ty, QPointF(where), picker.mapToGlobal(where), Qt::LeftButton, buttons,
+                      Qt::NoModifier);
+        QApplication::sendEvent(&picker, &e);
+    };
+    sendAt(QEvent::MouseButtonPress, Qt::LeftButton, grab);
+    sendAt(QEvent::MouseMove, Qt::LeftButton, moved);
+    sendAt(QEvent::MouseButtonRelease, Qt::NoButton, moved);
+    QCoreApplication::processEvents();
+    check("按住标题那一行能把这个窗拖走", picker.pos() == before + QPoint(60, 40) ? "yes" : "no",
+          "yes");
+
+    // 预览：拿的是 WGC 同一一路，所以要有真窗口在重绘 —— 就是上面那张每 30ms 换数字的卡。
+    auto* filterEdit = picker.findChild<QLineEdit*>(QStringLiteral("filter"));
+    filterEdit->setText(QStringLiteral("ltool-rec-card"));
+    int cardRow = -1;
+    for (int i = 0; i < plist->count(); ++i)
+        if (!plist->item(i)->isHidden()) { cardRow = i; break; }
+    check("列表里找得到那张自造的卡", cardRow >= 0 ? "yes" : "no", "yes");
+    plist->setCurrentRow(cardRow);
+    QElapsedTimer wait;
+    wait.start();
+    while (wait.elapsed() < 2500 && picker.preview()->framesSeen() == 0)
+        QCoreApplication::processEvents();
+    std::printf("INFO 预览：源=%dx%d 摆出来=%dx%d 帧数=%d 那句实话=%s\n",
+                picker.preview()->sourceSize().width(), picker.preview()->sourceSize().height(),
+                picker.preview()->shownSize().width(), picker.preview()->shownSize().height(),
+                picker.preview()->framesSeen(),
+                picker.preview()->lastError().toUtf8().constData());
+    check("选中一条就开这一路预览，并且真拿到过帧",
+          picker.preview()->framesSeen() > 0 ? "yes" : "no", "yes");
+    auto* capBox = picker.findChild<QComboBox*>(QStringLiteral("recMaxWidth"));
+    const int origCap = capBox->currentData().toInt();
+    const QSize src = picker.preview()->sourceSize();
+    check("预览摆出来的就是按当前档算出来的编码画幅",
+          picker.preview()->shownSize() == Recorder::encodedSize(src.width(), src.height(), origCap)
+              ? "yes" : "no", "yes");
+    // 换档要跟着换：那张卡只有 360 宽，任何档都不缩，所以这条拿整块屏幕来量
+    filterEdit->clear();
+    plist->setCurrentRow(0);
+    wait.restart();
+    while (wait.elapsed() < 2500 && picker.preview()->framesSeen() == 0)
+        QCoreApplication::processEvents();
+    const QSize monSrc = picker.preview()->sourceSize();
+    for (int i = 0; i < capBox->count(); ++i)
+        if (capBox->itemData(i).toInt() == 1280)
+            capBox->setCurrentIndex(i);
+    wait.restart();
+    const int seenBefore = picker.preview()->framesSeen();
+    while (wait.elapsed() < 2500 && picker.preview()->framesSeen() == seenBefore)
+        QCoreApplication::processEvents();
+    check("换「画面」档，预览跟着换成编码后的画幅（长边 ≤1280）",
+          QStringLiteral("%1/%2").arg(picker.preview()->shownSize().width() <= 1280 ? 1 : 0)
+              .arg(picker.preview()->shownSize()
+                       == Recorder::encodedSize(monSrc.width(), monSrc.height(), 1280)
+                   ? 1 : 0),
+          QStringLiteral("1/1"));
+    for (int i = 0; i < capBox->count(); ++i)
+        if (capBox->itemData(i).toInt() == origCap)
+            capBox->setCurrentIndex(i);
+    picker.hide();
+    check("窗一收起来就把取帧那一路放掉（不在背后空转）",
+          picker.preview()->active() ? "yes" : "no", "no");
 
     const QString path = QDir::tempPath() + "/ltool-recordui.mp4";
     QFile::remove(path);

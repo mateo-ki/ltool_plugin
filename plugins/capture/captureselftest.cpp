@@ -31,10 +31,12 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
+#include <QPushButton>
 #include <QScreen>
 #include <QThread>
 #include <QTimer>
@@ -436,6 +438,53 @@ extern "C" Q_DECL_EXPORT int ltoolPintoolRun()
     pw.setStripHidden(false);
     check("放出往期带：窗口回到原尺寸", sizeStr(pw.size()), sizeStr(s0));
     check("放出往期带：又命中第 0 张", QString::number(pw.probeThumbAt(QPoint(10, 10))), "0");
+
+    // ---- 拖边缩放：图的左上角不许漂 ----
+    // 他报的是"缩放大小拖动的时候位置不要变"。窗口那条边按住的点当然跟着鼠标走，
+    // 但**图本身**不该跟着重新居中一遍：以前 imageRect() 把图居中在客户区里，
+    // 于是拖右下角时长宽各分掉一点余量，图就往右下漂 —— 看着像"一缩放就跑位"。
+    const QPoint winTL = pw.geometry().topLeft();
+    const QPoint imgTL = pw.probeImageRect().topLeft();
+    const QSize imgSz = pw.probeImageRect().size();
+    const auto sendAt = [&pw](QEvent::Type type, const QPoint& wp) {
+        const QPoint gp = pw.mapToGlobal(wp);
+        const Qt::MouseButton btn = type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton;
+        QMouseEvent ev(type, QPointF(wp), QPointF(gp), Qt::LeftButton,
+                       type == QEvent::MouseMove ? Qt::LeftButton : btn, Qt::NoModifier);
+        QApplication::sendEvent(&pw, &ev);
+    };
+    const QPoint corner(pw.width() - 3, pw.height() - 3);   // 右下角 8px 内 = 右 + 下两条边
+    sendAt(QEvent::MouseButtonPress, corner);
+    for (int i = 1; i <= 4; ++i)
+        sendAt(QEvent::MouseMove, corner + QPoint(15 * i, 10 * i));
+    sendAt(QEvent::MouseButtonRelease, corner + QPoint(60, 40));
+    check("拖右下角：窗口左上角没被带着走",
+          QStringLiteral("%1,%2").arg(pw.geometry().x()).arg(pw.geometry().y()),
+          QStringLiteral("%1,%2").arg(winTL.x()).arg(winTL.y()));
+    check("拖右下角：图的左上角一字不动",
+          QStringLiteral("%1,%2").arg(pw.probeImageRect().x()).arg(pw.probeImageRect().y()),
+          QStringLiteral("%1,%2").arg(imgTL.x()).arg(imgTL.y()));
+    check("拖右下角：图确实跟着变大了（不是没生效）",
+          pw.probeImageRect().width() > imgSz.width() ? "yes" : "no", "yes");
+    check("拖右下角：窗口宽了 60 高了 40",
+          sizeStr(pw.size()), sizeStr(s0 + QSize(60, 40)));
+    // 拖左边那条：窗口左上角该跟着走（这是应有行为），但图的左上角必须**始终贴着客户区左上**，
+    // 不能因为居中而往右退回一条余量。
+    pw.resize(s0);
+    const QPoint leftTL = pw.geometry().topLeft();
+    const QPoint area0 = pw.probeImageRect().topLeft();
+    sendAt(QEvent::MouseButtonPress, QPoint(3, pw.height() / 2));
+    sendAt(QEvent::MouseMove, QPoint(3 + 25, pw.height() / 2));
+    sendAt(QEvent::MouseButtonRelease, QPoint(3 + 25, pw.height() / 2));
+    check("拖左边：窗口左上角跟着走（应有行为）",
+          pw.geometry().x() == leftTL.x() + 25 ? "yes" : "no", "yes");
+    check("拖左边：图的左上角还是贴着客户区左上（不重新居中）",
+          pw.probeImageRect().topLeft() == QPoint(pw.stripW(), 0) ? "yes" : "no", "yes");
+    std::printf("INFO 缩放前图区 %s，拖右下角之后 %s（左上角 %d,%d → %d,%d）\n",
+                rectStr(QRect(imgTL, imgSz)).toUtf8().constData(),
+                rectStr(pw.probeImageRect()).toUtf8().constData(),
+                imgTL.x(), imgTL.y(), pw.probeImageRect().x(), pw.probeImageRect().y());
+
     // 离屏抓两张图自己看一眼（不显示窗口、不在你桌面上闪）：一张正常、一张两样都收起
     pw.grab().save(shots + "/a_normal.png");
     pw.setBarHidden(true);
@@ -453,6 +502,68 @@ extern "C" Q_DECL_EXPORT int ltoolPintoolRun()
     check("叠用之后再放开：两个开关都回到开", (pw.barHidden() || pw.stripHidden()) ? "yes" : "no", "no");
     std::printf("INFO 离屏抓图：%s/a_normal.png 与 b_hidden.png\n", shots.toUtf8().constData());
     QFile::remove(Utils::capturesDir() + "/" + key);
+    // ---- 右键菜单的样式挂没挂上 ----
+    // 置顶窗是**另一个顶层窗口**，拿不到设置窗/搜索框各自那份 QMenu 样式表；而 Qt6 的
+    // windows11 风格画弹出菜单用的是**系统**的浅色底，字色却来自我们的深色调色板
+    // ⇒ 白底 + 浅灰字 = 看不见（2026-10-17 他截图报的就是这个）。
+    // 判据量的是 `pw.makeStyledMenu()` 那个真对象。第一版在这里自己 `new QMenu`，
+    // 改了样式表也量不出变化（离屏还照样"底色是深的"，因为调色板本来就是深的）—— 白绿一场；
+    // 现在认的是**只有样式表能给出来的那两个数**：底色 == CSS 里那格 #232429
+    // （不挂样式表时离屏量到的是调色板那格 #191a1e），以及 `padding: 4px` 推出来的首项 y。
+    {
+        QMenu* probeMenu = pw.makeStyledMenu();
+        probeMenu->addAction(QStringLiteral("复制到剪贴板"));
+        probeMenu->addAction(QStringLiteral("关闭"));
+        const QImage im = probeMenu->grab().toImage();
+        const QRect ig = probeMenu->actionGeometry(probeMenu->actions().first());
+        const QColor bg = im.pixelColor(5, qMax(4, im.height() / 2));
+        int brightest = 0;
+        for (int y = 0; y < im.height(); y += 2)
+            for (int x = 0; x < im.width(); x += 2)
+                brightest = qMax(brightest, im.pixelColor(x, y).lightness());
+        delete probeMenu;
+        std::printf("INFO 菜单：底像素 %s、首项 y=%d 高=%d、最亮像素 %d、图 %dx%d\n",
+                    bg.name(QColor::HexRgb).toUtf8().constData(), ig.y(), ig.height(), brightest,
+                    im.width(), im.height());
+        check("那份深色样式真挂上了（底色 == 样式里那格）",
+              bg.name(QColor::HexRgb), QStringLiteral("#232429"));
+        check("CSS 的 padding 生效了（首项不贴边）", ig.y() >= 4 ? "yes" : "no", "yes");
+        check("字比底色亮出一大截（看得清）", brightest - bg.lightness() > 120 ? "yes" : "no", "yes");
+    }
+    // ---- 工具栏那一排到底多宽（黑边的根因就在这）----
+    // setPixmap 里那句 setMinimumSize(这一排的 sizeHint, 140) 会把窗口撑到比图还宽，
+    // 多出来的那一条就是近黑色的空档。原来一排 612px；图标化之后必须显著降下来。
+    pw.setBarHidden(false);
+    pw.setStripHidden(false);
+    int nameless = 0, btns = 0;
+    for (QPushButton* b : pw.findChildren<QPushButton*>()) {
+        ++btns;
+        if (b->accessibleName().isEmpty() && b->text().isEmpty())
+            ++nameless;          // 图标按钮没文字，可访问名就是它唯一的"名字"
+    }
+    std::printf("INFO 放出工具栏：窗口最小宽 %d，按钮 %d 颗（既没文字又没可访问名的 %d 颗）\n",
+                pw.minimumWidth(), btns, nameless);
+    check("一排按钮收得下 460px（图宽 ≥384 就不会被撑出黑边）",
+          pw.minimumWidth() <= 460 ? "yes" : "no", "yes");
+    check("图标化之后每颗按钮都还认得出（文字或可访问名至少留一个）",
+          nameless == 0 ? "yes" : "no", "yes");
+    // 直接验他报的那件事：图够宽时，放出工具栏**不该**把窗口撑宽
+    // 直接验他报的那件事：图够宽时，放出工具栏**不该**把窗口撑宽。
+    // 图取 380 宽：离屏平台报的虚拟屏是 800x600，而 setPixmap 有一条"显示尺寸不超过屏宽 60%"
+    // （第一版拿 520 宽的图测，被这条夹成 478，红得莫名其妙 —— 那是夹具撞了屏幕，不是产品）。
+    QPixmap wide(380, 200);
+    wide.fill(QColor(120, 60, 60));
+    PinWindow pw2(wide, QString(), false);
+    pw2.setBarHidden(false);
+    pw2.setStripHidden(false);
+    std::printf("INFO pw2：窗口 %s，图区 %s，最小宽 %d（屏 %dx%d）\n", sizeStr(pw2.size()).toUtf8().constData(),
+                rectStr(pw2.probeImageRect()).toUtf8().constData(), pw2.minimumWidth(),
+                QGuiApplication::primaryScreen() ? QGuiApplication::primaryScreen()->geometry().width() : 0,
+                QGuiApplication::primaryScreen() ? QGuiApplication::primaryScreen()->geometry().height() : 0);
+    check("图够宽时放出工具栏：窗口不比「往期带 + 图宽」更宽（右边不多一块黑）",
+          pw2.width() <= pw2.stripW() + 380 ? "yes" : "no", "yes");
+    check("图够宽时放出工具栏：图按原尺寸摆（没被夹小）",
+          pw2.probeImageRect().width() == 380 ? "yes" : "no", "yes");
     std::printf("pintool: 失败 %d 项\n", bad);
     std::fflush(stdout);
     return bad == 0 ? 0 : 1;

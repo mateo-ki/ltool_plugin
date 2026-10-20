@@ -1,4 +1,5 @@
 #include "RepairPage.h"
+#include "platform/Launch.h"
 #include "DevEnv.h"
 #include "SilentInstallLog.h"
 #include "Utils.h"
@@ -386,7 +387,7 @@ void RepairPage::installRow(int row)
         QMessageBox::information(this, "ltool", "该组件没有配置自动安装方式。");
         return;
     }
-    Utils::launch(r.url);
+    Platform::launch(r.url);
     QMessageBox::information(this, "ltool", "已打开官方下载页，安装后点击\"重新检测\"。");
 }
 

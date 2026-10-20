@@ -18,14 +18,12 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
-#include <QLocalSocket>
 #include <QMessageBox>
 #include <QPair>
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QSettings>
-#include <QSystemTrayIcon>
 #include <QThread>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -442,36 +440,11 @@ bool progressWindowOn()
         .value(QStringLiteral("ui/archiveProgress"), false).toBool();
 }
 
-// 托盘上冒一句就走：不弹框、不抢焦点。
-// 优先把这句话交给常驻实例去举 —— 这个一次性进程要是为了"让气泡显示满 5 秒"而自己多活
-// 5 秒，用户看到的就是"右键解压要 5 秒"（实测解压本身 0.3 秒，那 5 秒比活儿本身长十几倍）。
-// 没有在跑的实例时才自己举：图标一死 Shell 立刻把气泡收回去，等于没提示，只能就地跑循环等到点。
+// 托盘上冒一句就走：本体已经收进 ltoolcore 的 Utils::trayNote（"为什么交给常驻实例去举"
+// 写在那儿），这一层只是当年它只归这个插件用时留下的名字 —— 右键那几处还在直接叫它。
 void trayNote(const QString& title, const QString& msg, int msec)
 {
-    {
-        QLocalSocket probe;
-        probe.connectToServer(QString::fromWCharArray(kInstanceKey));
-        if (probe.waitForConnected(200)) {
-            probe.write("note\t" + title.toUtf8() + '\t' + msg.toUtf8() + '\n');
-            probe.waitForBytesWritten(200);
-            probe.disconnectFromServer();
-            return;
-        }
-    }
-    if (!QSystemTrayIcon::isSystemTrayAvailable())
-        return;
-    QSystemTrayIcon tray;
-    if (!QApplication::windowIcon().isNull())
-        tray.setIcon(QApplication::windowIcon());
-    tray.show();
-    tray.showMessage(title, msg, QSystemTrayIcon::Information, msec);
-    QElapsedTimer clock;
-    clock.start();
-    while (clock.elapsed() < msec) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-        QThread::msleep(20);
-    }
-    tray.hide();
+    Utils::trayNote(title, msg, msec);
 }
 
 // 不弹框那一种：这个进程本来就是为这一次动作起的，直接在它自己线程里跑完就行。

@@ -11,6 +11,7 @@
 #include "Ocr.h"
 
 class QPushButton;
+class QMenu;
 class QWidget;
 namespace Ocr { struct Line; }
 
@@ -46,6 +47,9 @@ public:
     void applyHug();   // 工具栏收起时把窗口收到"抱住图"（两个开关共用）
     bool barHidden() const { return m_barHidden; }
     bool stripHidden() const { return m_stripHidden; }
+    // 置顶窗两处右键菜单都从这颗拿（深色样式挂在里面，见 .cpp 那颗函数的注释）。
+    // 公开是给自测的：真弹一下要占屏幕，判据只能量"建好的那一份"。调用方负责删。
+    QMenu* makeStyledMenu();
     int barH() const;      // 工具栏现在占多高（收起来就是 0）
     int stripW() const { return m_stripW; }   // 往期带现在占多宽（收起来就是 0）
 

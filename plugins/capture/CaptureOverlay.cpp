@@ -1,4 +1,5 @@
 #include "CaptureHistory.h"
+#include "platform/ProcInfo.h"
 #include "CaptureOverlay.h"
 #include "OcrPanel.h"
 #include "PinWindow.h"
@@ -850,5 +851,5 @@ void CaptureOverlay::cancel()
     s_instance = nullptr;
     CaptureState::setActive(false);
     close();
-    Utils::trimWorkingSet(); // 释放全屏位图占用的内存
+    Platform::trimWorkingSet(); // 释放全屏位图占用的内存
 }

@@ -1,4 +1,5 @@
 #include "LanguagePage.h"
+#include "platform/Launch.h"
 
 #include <QPointer>
 
@@ -919,9 +920,9 @@ void LanguagePage::openConfigFile(QListWidget* list, int row)
         return;
     const QString path = list->item(row)->data(Qt::UserRole).toString();
     if (QFileInfo::exists(path))
-        Utils::launch(path);
+        Platform::launch(path);
     else
-        Utils::revealInExplorer(path);
+        Platform::reveal(path);
 }
 
 void LanguagePage::openRelatedSoftware(QListWidget* list, int row)
@@ -933,7 +934,7 @@ void LanguagePage::openRelatedSoftware(QListWidget* list, int row)
     for (const AppEntry& a : AppScanner::loadIndex()) {
         if (a.name.contains(name, Qt::CaseInsensitive)
             || a.target.contains(name, Qt::CaseInsensitive)) {
-            Utils::launch(a.target, QString(), QString(), true);
+            Platform::launch(a.target, QString(), QString(), true);
             return;
         }
     }

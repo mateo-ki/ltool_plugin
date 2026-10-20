@@ -2,8 +2,8 @@
  "Id": "user",
  "Name": "Windows 用户名",
  "Desc": "看清自己是哪个账户，改显示名或改账户名（都要管理员授权）",
- "Api": 3,
- "Version": "1.0.0",
+ "Api": 4,
+ "Version": "1.0.3",
  "Keywords": [
   "用户名",
   "账户",

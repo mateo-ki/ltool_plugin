@@ -1,0 +1,17 @@
+{
+ "Id": "linuxdo",
+ "Name": "linux.do 盯帖",
+ "Desc": "每隔几分钟看 linux.do 有没有写着这些词的帖子，命中就在托盘冒一句",
+ "Api": 4,
+ "Version": "1.0.2",
+ "Activate": true,
+ "Keywords": [
+  "盯帖",
+  "论坛",
+  "监控",
+  "通知",
+  "新帖",
+  "linuxdo"
+ ],
+ "Color": "226,120,60"
+}

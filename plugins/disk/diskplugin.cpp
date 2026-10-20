@@ -19,7 +19,7 @@ public:
     int apiVersion() const override { return LTOOL_PLUGIN_API_VERSION; }
     QString id() const override { return QStringLiteral("disk"); }
     QString name() const override { return QStringLiteral("磁盘清理"); }
-    QString desc() const override { return QStringLiteral("可清理位置 + 所选盘的占用分析（矩形树图）"); }
+    QString desc() const override { return QStringLiteral("可清理位置 + 占用分析（矩形树图，能直读 $MFT）"); }
     QStringList keywords() const override
     {
         return { QStringLiteral("磁盘"), QStringLiteral("清理"), QStringLiteral("占用"), QStringLiteral("空间"), QStringLiteral("c盘"), QStringLiteral("disk") };

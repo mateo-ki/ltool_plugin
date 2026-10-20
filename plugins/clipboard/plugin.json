@@ -2,8 +2,8 @@
  "Id": "clipboard",
  "Name": "剪贴板",
  "Desc": "复制过的文本和图片，列表可按关键字过滤",
- "Api": 3,
- "Version": "1.0.0",
+ "Api": 4,
+ "Version": "1.1.1",
  "Keywords": [
   "剪贴板",
   "剪贴板历史",

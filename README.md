@@ -1,19 +1,25 @@
 # ltool 插件仓库
 
-[ltool](https://github.com/mateo-ki/ltool) 自带那十二个工具的**源码**，每个一个目录，能独立编出 `ltool-<id>.dll`。
-主仓库只留宿主那一层薄壳（热键、托盘、单实例、命令行自测）和一份 `ltoolcore.dll`；界面本体都在这里。
+**这份 `plugins/` 是 [ltool 主仓库](https://github.com/mateo-ki/ltool) 里 `plugins/` 的一份镜像**：
+类名、源文件、`plugin.json` 全在主仓库那边改，这里只负责"能不能脱离那棵树独立编出来"。
+（2026-10-20 实测：主仓库的 PCH 挂在 `ltoolcore` 的 INTERFACE 上，整棵树白拿一份预编译头，
+于是三颗插件漏 `#include <QPushButton>` / `<QLabel>` / `<QThread>` 它从来不红 ——
+**独立编这一侧才量得出来**。别把这里当第二份源码改，那正是 #91 那批闪退的来路之一。）
+
+主仓库只留宿主那一层薄壳（热键、托盘、单实例、命令行自测）和一份 `ltoolcore.dll`；界面本体在两边同源。
 
 ## 一面一条
 
 | 东西 | 是什么 |
 | --- | --- |
-| `plugins/<id>/` | 一个插件：页面/动作本体 + 一层 `LToolPlugin` 壳 + `plugin.json` + 自己的 `CMakeLists.txt` |
-| `sdk/` | 主仓库 `tools/make_sdk.py` 生成的**快照**：core 公开的 15 个头 + `ltoolcore.lib`（导入库）+ `ltool-plugin.cmake` + `INFO.txt` |
-| `dist/` | 编好的 12 个 dll + `index.json`（插件商店读的就是它）；每 dll 的 SHA256 从产物现算 |
-| `tools/make_index.py` | 生成 `dist/index.json` |
-| `.github/workflows/build.yml` | CI：装依赖（vcpkg classic，只要 `qtbase`）→ 验 Qt 版本 → 验 SDK → 验 `dist/` 自洽 → 编 12 个 dll → 出 index.json → 存 artifact（**不自动发布**） |
+| `plugins/<id>/` | 一个插件：页面/动作本体 + 一层 `LToolPlugin` 壳 + `plugin.json` + 自己的 `CMakeLists.txt`（**19 个**，从主仓库同步） |
+| `sdk/` | 主仓库 `tools/make_sdk.py` 生成的**快照**：core 公开的 25 个头 + `ltoolcore.lib`（导入库）+ `ltool-plugin.cmake` + `INFO.txt`。主仓库改了 core 的公开面就得重生成它（接口号那份由 `tools/core_abi_gate.py` 盯着） |
+| `dist/` | 编好的 19 个 dll + `index.json`。**从 ltool 1.3.0 起，插件商店不再读这里** —— 商店读的是主仓库那次发版的资产（`releases/download/v<版本>/plugins-index.json`，dll 和 core 同一次构建）。这里留着 = 独立编出来的参照物 |
+| `tools/make_index.py` | 生成 `dist/index.json`（sha256/字节数从产物现算） |
+| `.github/workflows/build.yml` | CI：装依赖（vcpkg classic，只要 `qtbase`）→ 验 Qt 版本 → 验 SDK（**按 API 4 编，对不上就红**）→ 验 `dist/` 自洽 → 编 19 个 dll → 出 index.json → 存 artifact（**不自动发布**） |
 
 ## 本地编一个 dll
+
 
 ```
 # 走 vcpkg（和 CI 同一条路：classic 模式装好的那棵树）

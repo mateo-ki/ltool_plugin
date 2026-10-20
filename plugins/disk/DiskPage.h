@@ -40,6 +40,7 @@ private slots:
     void analysisUp();
     void showNode(int node);  // 下钻（查表，不重扫）
     void tick();              // 轮询后台扫描进度/结果
+    void mftRescan();         // 「直读 MFT 重扫」：起一个提权的自己把整盘读出来
 
 private:
     struct CleanRow {
@@ -57,6 +58,7 @@ private:
         std::atomic<qint64> dirs{0};
         std::mutex m;
         QString current;                 // 正在扫的分支
+        QString engine;                  // 这次走的是哪条路，界面要说（见 DiskScan::Progress）
         // 已经整体扫完的一级分支（DiskScan 报的定稿值）：整盘要 14~19 秒，
         // 但小分支几百毫秒就出得来，界面先摆这些，别让人干等到最后一秒才有数字
         QVector<QPair<QString, qint64>> branches;
@@ -75,6 +77,8 @@ private:
     void renderAnalysis();
     void renderBranches();    // 扫描途中：把已扫完的一级分支先列出来
     void showCached(const QString& root);   // 这个盘扫过就别再扫第二遍
+    // 提权那趟读回来的收尾（在界面线程跑）：成功就换上这棵 MFT 的树，失败就把原因写在状态行
+    void applyMftTree(const QString& root, const DiskScan::Tree& t, int rc, const QString& err);
 
     QLabel* m_cleanTotal = nullptr;
     QLabel* m_usedTitle = nullptr;
@@ -86,6 +90,8 @@ private:
     QVBoxLayout* m_rowsLay = nullptr;
     QVector<CleanRow> m_rows;
     QPushButton* m_analyzeBtn = nullptr;
+    QPushButton* m_mftBtn = nullptr;    // 「直读 MFT 重扫」（要弹一次 UAC，见 mftRescan）
+    bool m_mftBusy = false;
     QPushButton* m_cleanBtn = nullptr;
     QTabBar* m_tabs = nullptr;
     QStackedWidget* m_stack = nullptr;

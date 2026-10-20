@@ -5,7 +5,12 @@
 #include <QVector>
 
 // 右键菜单背后那几个动作的干活部分：占用分析、粉碎、谁占用着它。
-// 全部是纯 Win32，不依赖 Qt 界面，方便单独测。
+// 都不依赖 Qt 界面，方便单独测（`--shredtest` / `--whohastest` 那两条无界面入口）。
+//
+// 底下这三颗的实现按平台分两份：src/platform/FileOps_win.cpp 和 FileOps_posix.cpp
+// （第七道缝）。为什么缝开在这里而不是整个模块：src/FileTools.cpp 已经在可移植名单里，
+// 它调的就是这三个；而 info / usage 要的是盘符、簇、NTFS 压缩大小那套概念，POSIX 上没有
+// 对等物，留在 Windows 那半边没进名单。
 namespace FileOps {
 
 struct Info {

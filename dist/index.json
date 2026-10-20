@@ -1,12 +1,12 @@
 {
  "schema": 1,
- "core": "来自 ltool 1.1.0（插件接口 API 3）",
+ "core": "来自 ltool 1.3.3（插件接口 API 4）",
  "plugins": [
   {
    "id": "ads",
    "name": "广告弹窗",
    "desc": "扫描并拦截桌面广告弹窗，白名单与拦截规则",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "广告",
     "弹窗",
@@ -15,18 +15,18 @@
     "广告弹窗"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.1",
    "color": "136,87,229",
    "file": "ltool-ads.dll",
    "bytes": 95232,
-   "sha256": "b58d7da4cde54b8044d6bbe0d81a17b3666cdba45354e4c593373d68816877e8",
+   "sha256": "c598e0111c3799c8ddc0760de444bcc0f8953de561b2b45c88cdeba13c22e9a2",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-ads.dll"
   },
   {
    "id": "base64",
    "name": "Base64 编解码",
    "desc": "文本/图片互转，解不出合法 UTF-8 时给十六进制",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "base64",
     "b64",
@@ -34,18 +34,18 @@
     "解码"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.1",
    "color": "190,130,60",
    "file": "ltool-base64.dll",
    "bytes": 69632,
-   "sha256": "7502df885859d2f1aa87e7ba0c184bdd2286a109ad95acb4ddfd46851f426dbe",
+   "sha256": "09888d7dd02e507e4d1f3f5dd6f5ee23eca6aebc32550dc9ba2ffbc42980be31",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-base64.dll"
   },
   {
    "id": "capture",
    "name": "截图",
    "desc": "按 F1 全屏截图：框选/窗口吸附/标注，再置顶、取字（OCR 首次用要下一趟引擎）",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "截图",
     "截屏",
@@ -59,18 +59,18 @@
    "actions": [
     "capture"
    ],
-   "version": "1.0.0",
+   "version": "1.0.7",
    "color": "52,152,219",
    "file": "ltool-capture.dll",
-   "bytes": 354304,
-   "sha256": "2a2b601fce42efb71c22cadd5f6f5ee4001041e5659a44d62b6263164ef3f4bc",
+   "bytes": 370176,
+   "sha256": "2dc19dfb0cf5b7c6b7769837c388d984c9000caaef9359531171507a42cadb34",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-capture.dll"
   },
   {
    "id": "clipboard",
    "name": "剪贴板",
    "desc": "复制过的文本和图片，列表可按关键字过滤",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "剪贴板",
     "剪贴板历史",
@@ -78,18 +78,18 @@
     "clipboard"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.1.1",
    "color": "40,120,160",
    "file": "ltool-clipboard.dll",
-   "bytes": 90112,
-   "sha256": "f1687a52ace388f1e6d3a1c45dc2cf21d2ebfd789f1a7792e0e74a0277420e34",
+   "bytes": 125952,
+   "sha256": "67befedbc4497ab813aa2fa625cc375c184be1f2e87cea826200bb8874543363",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-clipboard.dll"
   },
   {
    "id": "disk",
    "name": "磁盘清理",
-   "desc": "可清理位置 + 所选盘的占用分析（矩形树图）",
-   "api": 3,
+   "desc": "可清理位置 + 占用分析（矩形树图，能直读 $MFT）",
+   "api": 4,
    "keywords": [
     "磁盘",
     "清理",
@@ -99,36 +99,76 @@
     "disk"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "87,160,40",
    "file": "ltool-disk.dll",
-   "bytes": 170496,
-   "sha256": "151feb59e6d08fcd2a671ca8e3d0420dbd76b8684541d7b4b659a703b97145d2",
+   "bytes": 183808,
+   "sha256": "f4c9d89f0770def850774fb32e63341eb6a6eb4319efa8dc2c199942fd19d0b2",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-disk.dll"
+  },
+  {
+   "id": "downloads",
+   "name": "下载器",
+   "desc": "多线程下载、断点续传与任务表",
+   "api": 4,
+   "keywords": [
+    "下载",
+    "download",
+    "http"
+   ],
+   "actions": [],
+   "version": "1.0.2",
+   "color": "13,165,170",
+   "file": "ltool-downloads.dll",
+   "bytes": 68096,
+   "sha256": "efc1a54227ed8a33be621525876b14ae5e9a3c9ebcd7e3c961ed6cc3e9d4bbdb",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-downloads.dll"
+  },
+  {
+   "id": "grid",
+   "name": "图片排版",
+   "desc": "四宫/六宫/九宫：拖图进去、拖动换顺序、选背景色，合成一张",
+   "api": 4,
+   "keywords": [
+    "宫格",
+    "四宫格",
+    "六宫格",
+    "九宫格",
+    "排版",
+    "拼图",
+    "grid"
+   ],
+   "actions": [],
+   "version": "1.0.2",
+   "color": "87,160,40",
+   "file": "ltool-grid.dll",
+   "bytes": 157696,
+   "sha256": "07c9530a28c8d2b5b5da12e2df9618cd2efd444309ad1f45978f20e53fdc9ece",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-grid.dll"
   },
   {
    "id": "json",
    "name": "JSON 格式化",
    "desc": "可折叠树 + 自动换行，文本区可直接改",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "json",
     "格式化",
     "json格式化"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.1",
    "color": "90,140,220",
    "file": "ltool-json.dll",
    "bytes": 80896,
-   "sha256": "3ae077a0e242d7608ff0a20648ba8657565393d5e0a885312c05f0f08d3875ce",
+   "sha256": "0b4703a272978b098ed7099516e8943da3cba9093ed85a96332f8206368ec82c",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-json.dll"
   },
   {
    "id": "language",
    "name": "开发语言与环境",
    "desc": "检测、安装并配置 Java、C++、Node.js、Python、Rust 等开发语言与环境",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "语言",
     "环境",
@@ -144,36 +184,57 @@
     "path"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "40,150,220",
    "file": "ltool-language.dll",
    "bytes": 178176,
-   "sha256": "bcce1de7eda06e0aac3550d4470cbd003d7b4623ccc3f83d423b366126821a9e",
+   "sha256": "7419dc6e29439f0ae8ade96e0d083a469e4b5a4735c2feb0e7cbd0ac5ecdb78b",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-language.dll"
+  },
+  {
+   "id": "linuxdo",
+   "name": "linux.do 盯帖",
+   "desc": "每隔几分钟看 linux.do 有没有写着这些词的帖子，命中就在托盘冒一句",
+   "api": 4,
+   "keywords": [
+    "盯帖",
+    "论坛",
+    "监控",
+    "通知",
+    "新帖",
+    "linuxdo"
+   ],
+   "actions": [],
+   "version": "1.0.2",
+   "color": "226,120,60",
+   "file": "ltool-linuxdo.dll",
+   "bytes": 182784,
+   "sha256": "32e3c2fb61ff63e31174b3110fa88206c9635258314a335d194ffd1f8ce8fa32",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-linuxdo.dll"
   },
   {
    "id": "network",
    "name": "网络",
    "desc": "系统代理检测、代理方案对比与内置下载设置",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "网络",
     "代理",
     "proxy"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.1",
    "color": "0,150,199",
    "file": "ltool-network.dll",
    "bytes": 102912,
-   "sha256": "f904b9d3683a234415a81c348aaac2a87d38216355baf42a562c3acfd2900081",
+   "sha256": "53baea38a9fcaccb500897d2b191f799db862dd1850088c330920c8b40f6d119",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-network.dll"
   },
   {
    "id": "record",
    "name": "录屏",
    "desc": "按 F2 录整块屏幕或某一个窗口，出 mp4（画质/画面两档可选）",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "录屏",
     "录像",
@@ -184,18 +245,18 @@
    "actions": [
     "record"
    ],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "219,72,160",
    "file": "ltool-record.dll",
-   "bytes": 256000,
-   "sha256": "941d4c3afa36f49a91e315c59ae593f3685478525abd5d4e52bddf174d1b6acd",
+   "bytes": 283136,
+   "sha256": "9dfeaf254f7006ca6480126bf4d6a8ce2844b0706478aa53749ad4999db990bb",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-record.dll"
   },
   {
    "id": "registry",
    "name": "注册表分析",
    "desc": "扫失效路径与 9x 遗留键：卸载残留 / 启动项 / 关联 / COM / 服务 / 死盘符",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "注册表",
     "registry",
@@ -205,18 +266,18 @@
     "失效"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "150,100,60",
    "file": "ltool-registry.dll",
    "bytes": 96768,
-   "sha256": "d7d47f7a940128cdfccf8536b6b87e7e40d569004614b3e7a63f1384e7aa5513",
+   "sha256": "3b86be7943ff711790d2bd8414a45ad21696eadf95f516ff525d233b7847968a",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-registry.dll"
   },
   {
    "id": "repair",
    "name": "DLL 修复",
    "desc": "检测微软运行库 / DirectX / .NET，缺什么补什么",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "dll",
     "运行库",
@@ -228,18 +289,18 @@
     "net"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "214,69,69",
    "file": "ltool-repair.dll",
    "bytes": 90112,
-   "sha256": "2dea38336dccb034a8d161a03c11021a3ae16812be2546435113a6f0933258ae",
+   "sha256": "f3841c6675ec4cc3376ccef5ec33dcabc19baa0cfceabab2e6dfc436fbfcdf4d",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-repair.dll"
   },
   {
    "id": "shell",
    "name": "右键动作",
    "desc": "占用分析 / 谁占用着它 / 粉碎 / 解压 / 压缩为 zip·7z",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "解压",
     "压缩",
@@ -257,18 +318,36 @@
     "compress-zip",
     "compress-7z"
    ],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "203,110,52",
    "file": "ltool-shell.dll",
-   "bytes": 141312,
-   "sha256": "4aa240ee2523a315b3643324297ba44ce9fa64d6f4511e373cb86579ed0514ea",
+   "bytes": 138240,
+   "sha256": "bdf04d45e1e9a00968f7e3d24ce9037f72022689457e5be7cf0ed9752514480e",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-shell.dll"
+  },
+  {
+   "id": "software",
+   "name": "软件",
+   "desc": "推荐软件一键安装 + 本机已装程序的卸载与防火墙放行",
+   "api": 4,
+   "keywords": [
+    "软件",
+    "卸载",
+    "winget"
+   ],
+   "actions": [],
+   "version": "1.0.2",
+   "color": "46,160,88",
+   "file": "ltool-software.dll",
+   "bytes": 242176,
+   "sha256": "45c9d6932288fdae98b8a1b32fa4ef462a84f15fe2df30f6ee53941ebe54cdb1",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-software.dll"
   },
   {
    "id": "startup",
    "name": "开机启动分析",
    "desc": "开机后都有什么自己起来 · 谁家的 · 哪些该管哪些不用管",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "启动",
     "开机",
@@ -279,18 +358,36 @@
     "计划任务"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.2",
    "color": "60,140,120",
    "file": "ltool-startup.dll",
    "bytes": 99840,
-   "sha256": "f5360164d54827bb2178747fea646630f4329edc2ef72d0b4ad0c085beeb0a27",
+   "sha256": "7aebaecb77732d55a2d9a990897dfdf9e243151f92103856419e86c4f1027f9d",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-startup.dll"
+  },
+  {
+   "id": "tasks",
+   "name": "定时任务",
+   "desc": "到点跑 c++/java/python/js/rust 脚本",
+   "api": 4,
+   "keywords": [
+    "定时",
+    "计划",
+    "cron"
+   ],
+   "actions": [],
+   "version": "1.0.1",
+   "color": "214,128,15",
+   "file": "ltool-tasks.dll",
+   "bytes": 98304,
+   "sha256": "0264db80cf525a61b88e849ae06703cb5cc081d3a36d13454d4f45b81eae2318",
+   "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-tasks.dll"
   },
   {
    "id": "user",
    "name": "Windows 用户名",
    "desc": "看清自己是哪个账户，改显示名或改账户名（都要管理员授权）",
-   "api": 3,
+   "api": 4,
    "keywords": [
     "用户名",
     "账户",
@@ -301,11 +398,11 @@
     "fullname"
    ],
    "actions": [],
-   "version": "1.0.0",
+   "version": "1.0.3",
    "color": "120,90,200",
    "file": "ltool-user.dll",
-   "bytes": 124928,
-   "sha256": "fb520b6496c5f5b5960be39671af82ffd6a2ee36697cad9d393a86c1e79a3d05",
+   "bytes": 142848,
+   "sha256": "118e0e78e1c29eaa12a22b0ceb663138c2f2e03c8d0e437121d757f6db8a0a7e",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-user.dll"
   }
  ]

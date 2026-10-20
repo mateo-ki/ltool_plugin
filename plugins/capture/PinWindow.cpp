@@ -1,4 +1,5 @@
 #include "PinWindow.h"
+#include "platform/Launch.h"
 
 #include "OcrBundle.h"
 #include "OcrPanel.h"
@@ -14,6 +15,7 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QMenu>
+#include <memory>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -37,6 +39,73 @@ QPen strokePen()
     pen.setCapStyle(Qt::RoundCap);
     pen.setJoinStyle(Qt::RoundJoin);
     return pen;
+}
+
+// 置顶窗那几颗动作按钮的图标。画法和 Anno::toolIcon 同一套：18×18、#e8ebf2、1.7 圆头线。
+// 为什么整排换成图标：这一排的 sizeHint 原来是 **612px** 宽，比大多数区域截图还宽，
+// 而 setPixmap 里有 setMinimumSize(那一排宽, 140) —— 一按「显示工具栏」窗口就被撑到 612，
+// 图右边多出一块近黑色（#18191d）的空档（2026-10-17 他报的"显示工具栏右边多一块黑边"）。
+// 图标化之后这一排约 430px，图宽 ≥354 就不会再出现那块空档。
+// 文字没了，**可访问名必须补上**（读屏/UIA 靠它认按钮），计数这类信息也挪到 tooltip 里。
+enum ActIcon { AiMove, AiUndo, AiCopy, AiPick, AiHistory, AiSave, AiClose };
+
+QIcon actIcon(int which)
+{
+    QPixmap pm(18, 18);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    QPen pen(QColor("#e8ebf2"));
+    pen.setWidthF(1.7);
+    pen.setCapStyle(Qt::RoundCap);
+    pen.setJoinStyle(Qt::RoundJoin);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    switch (which) {
+    case AiMove:                       // 光标箭头：拖动 / 选中
+        p.drawPolygon(QPolygonF{ QPointF(5, 2.5), QPointF(5, 14.5), QPointF(8, 11.5),
+                                 QPointF(10, 15.5), QPointF(12, 14.5), QPointF(10, 10.5),
+                                 QPointF(14, 10.5) });
+        break;
+    case AiUndo:                       // 往左的回头箭头
+        p.drawLine(QPointF(6, 6.5), QPointF(14, 6.5));
+        p.drawLine(QPointF(14, 6.5), QPointF(14, 11.5));
+        p.drawPolyline(QPolygonF{ QPointF(8.8, 3.6), QPointF(5.6, 6.5), QPointF(8.8, 9.4) });
+        break;
+    case AiCopy:                       // 两份叠着的纸
+        p.drawPolyline(QPolygonF{ QPointF(6.5, 3), QPointF(15, 3), QPointF(15, 11.5) });
+        p.drawRoundedRect(QRectF(3, 6, 9.5, 9.5), 1.5, 1.5);
+        break;
+    case AiPick:                       // 虚线框住两行字 = 在图上划着选字
+        {
+            QPen dash(QColor("#e8ebf2"));
+            dash.setWidthF(1.2);
+            dash.setStyle(Qt::DashLine);
+            p.setPen(dash);
+            p.drawRect(3, 4, 12, 10);
+            p.setPen(pen);
+        }
+        p.drawLine(QPointF(5.5, 7.5), QPointF(12.5, 7.5));
+        p.drawLine(QPointF(5.5, 10.5), QPointF(10, 10.5));
+        break;
+    case AiHistory:                    // 时钟
+        p.drawEllipse(QRectF(3.5, 3.5, 11, 11));
+        p.drawLine(QPointF(9, 9), QPointF(9, 5.8));
+        p.drawLine(QPointF(9, 9), QPointF(11.4, 10.4));
+        break;
+    case AiSave:                       // 软盘
+        p.drawRoundedRect(QRectF(3.5, 3.5, 11, 11), 1.5, 1.5);
+        p.drawPolyline(QPolygonF{ QPointF(6.5, 3.5), QPointF(6.5, 7.5), QPointF(11.5, 7.5),
+                                  QPointF(11.5, 3.5) });
+        p.drawRect(6.5, 9.5, 5, 5);
+        break;
+    case AiClose:
+        p.drawLine(QPointF(4.5, 4.5), QPointF(13.5, 13.5));
+        p.drawLine(QPointF(13.5, 4.5), QPointF(4.5, 13.5));
+        break;
+    }
+    p.end();
+    return QIcon(pm);
 }
 
 } // namespace
@@ -155,10 +224,12 @@ QRect PinWindow::imageRect() const
     if (m_pm.isNull())
         return area;
     const QSize s = m_pm.size().scaled(area.size(), Qt::KeepAspectRatio);
-    // 用整除自己算居中：area.center() 会把中心往前偏半像素，四舍五入后图的左沿
-    // 可能落到 m_stripW 左边一列，那一列就同时属于历史条和图片（点在图上却换成了图）
-    return QRect(QPoint(area.left() + (area.width() - s.width()) / 2,
-                        area.top() + (area.height() - s.height()) / 2), s);
+    // **钉在客户区左上，不居中**。居中会让"拖边缩放"变成"图跟着跑位"：按住右下角往右下拖，
+    // 长宽各分掉一点余量，图就往右下漂几个像素（--pintool 量到的是 2px，屏幕上就是"一跳一跳"）。
+    // 钉住左上之后，拖哪条边都只改大小，图的左上角一动不动。
+    // 顺带把另一件事变简单了：以前算居中要用整除，因为 area.center() 会往前偏半格，
+    // 四舍五入后图的左沿可能落到历史条那一列里（点在图上却换成了图）—— 现在左沿恒等于 m_stripW。
+    return QRect(area.topLeft(), s);
 }
 
 double PinWindow::viewScale() const
@@ -957,11 +1028,8 @@ void PinWindow::buildToolbar()
         b->setToolTip(t.tip);
         b->setAccessibleName(QString::fromUtf8(t.label));
         b->setCursor(Qt::PointingHandCursor);
-        b->setFixedWidth(t.tool == None ? 62 : 30);
-        if (t.tool == None)
-            b->setText(QStringLiteral("拖动/选择"));
-        else
-            b->setIcon(Anno::toolIcon(t.tool));
+        b->setFixedWidth(30);
+        b->setIcon(t.tool == None ? actIcon(AiMove) : Anno::toolIcon(t.tool));
         group->addButton(b);
         if (t.tool == None)
             b->setChecked(true);
@@ -978,18 +1046,24 @@ void PinWindow::buildToolbar()
         lay->addWidget(b);
     }
     lay->addSpacing(8);
-    m_undoBtn = new QPushButton("撤销", m_toolbar);
+    m_undoBtn = new QPushButton(m_toolbar);
     m_undoBtn->setToolTip("撤销上一步图片操作（Ctrl+Z）");
+    m_undoBtn->setAccessibleName(QStringLiteral("撤销"));
+    m_undoBtn->setIcon(actIcon(AiUndo));
     m_undoBtn->setCursor(Qt::PointingHandCursor);
+    m_undoBtn->setFixedWidth(30);
     connect(m_undoBtn, &QPushButton::clicked, this, &PinWindow::undo);
     lay->addWidget(m_undoBtn);
-    auto* copyBtn = new QPushButton("复制", m_toolbar);
+    auto* copyBtn = new QPushButton(m_toolbar);
     copyBtn->setToolTip("把当前（含标注）的图复制到剪贴板");
+    copyBtn->setAccessibleName(QStringLiteral("复制"));
+    copyBtn->setIcon(actIcon(AiCopy));
+    copyBtn->setFixedWidth(30);
     connect(copyBtn, &QPushButton::clicked, this, [this] {
         QApplication::clipboard()->setPixmap(m_flat.isNull() ? m_pm : m_flat);
     });
     lay->addWidget(copyBtn);
-    auto* ocrBtn = new QPushButton("划词", m_toolbar);
+    auto* ocrBtn = new QPushButton(m_toolbar);
     ocrBtn->setToolTip("在这张图上直接划着选字（像微信那样）\n"
                        "拖动选一片，单击选整词，松手就进剪贴板，窗不关\n"
                        "Enter 复制整张图的文字，Esc 退出\n"
@@ -998,46 +1072,61 @@ void PinWindow::buildToolbar()
     ocrBtn->setCheckable(true);
     ocrBtn->setCursor(Qt::PointingHandCursor);
     ocrBtn->setAccessibleName(QStringLiteral("划词"));
+    ocrBtn->setIcon(actIcon(AiPick));
+    ocrBtn->setFixedWidth(30);
     connect(ocrBtn, &QPushButton::clicked, this, [this] { togglePick(); });
     m_pickBtn = ocrBtn;
     lay->addWidget(ocrBtn);
-    m_histBtn = new QPushButton(QStringLiteral("历史"), m_toolbar);
+    m_histBtn = new QPushButton(m_toolbar);
     m_histBtn->setToolTip("显示 / 收起左边那条往期截图。\n"
                           "想把底部这条工具栏也收起来：在图上右键 →「隐藏工具栏」。");
     m_histBtn->setCheckable(true);
     m_histBtn->setChecked(true);   // 默认往期带是显示着的
     m_histBtn->setCursor(Qt::PointingHandCursor);
     m_histBtn->setAccessibleName(QStringLiteral("历史"));
+    m_histBtn->setIcon(actIcon(AiHistory));
+    m_histBtn->setFixedWidth(30);
     connect(m_histBtn, &QPushButton::clicked, this, [this] { setStripHidden(!m_histBtn->isChecked()); });
     lay->addWidget(m_histBtn);
-    auto* saveBtn = new QPushButton("保存", m_toolbar);
+    auto* saveBtn = new QPushButton(m_toolbar);
     saveBtn->setToolTip("另存为 PNG");
+    saveBtn->setAccessibleName(QStringLiteral("保存"));
+    saveBtn->setIcon(actIcon(AiSave));
+    saveBtn->setFixedWidth(30);
     connect(saveBtn, &QPushButton::clicked, this, [this] {
         const QString path = QString("%1/pin-%2.png")
                                  .arg(Utils::capturesDir())
                                  .arg(QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss"));
         if ((m_flat.isNull() ? m_pm : m_flat).save(path))
-            Utils::revealInExplorer(path);
+            Platform::reveal(path);
     });
     lay->addWidget(saveBtn);
     lay->addStretch(1);
-    m_pinBtn = new QPushButton(QStringLiteral("📌 自动让位"), m_toolbar);
+    m_pinBtn = new QPushButton(m_toolbar);
     m_pinBtn->setToolTip("默认：别的程序被激活时，截图窗不再压着它；点一下截图窗又回到最前。\n"
                          "按这里改成「一直置顶」。");
     m_pinBtn->setCursor(Qt::PointingHandCursor);
-    m_pinBtn->setFixedWidth(96);
+    m_pinBtn->setAccessibleName(QStringLiteral("自动让位"));
+    m_pinBtn->setIcon(Anno::toolIcon(Anno::Pin));
+    m_pinBtn->setFixedWidth(30);
     connect(m_pinBtn, &QPushButton::clicked, this, [this] {
         m_pinned = !m_pinned;
-        m_pinBtn->setText(m_pinned ? QStringLiteral("📌 一直置顶")
-                                   : QStringLiteral("📌 自动让位"));
+        // 图标化之后"现在是哪一种"只能靠选中态（蓝底）+ 可访问名 + 悬停说明来说
+        m_pinBtn->setAccessibleName(m_pinned ? QStringLiteral("一直置顶")
+                                             : QStringLiteral("自动让位"));
+        m_pinBtn->setToolTip(m_pinned
+                                 ? QStringLiteral("现在：一直置顶，别的程序激活也不让位。点一下改回「自动让位」。")
+                                 : QStringLiteral("现在：自动让位。点一下改成「一直置顶」。"));
         m_pinBtn->setChecked(m_pinned);
         applyTopmost(true);
     });
     lay->addWidget(m_pinBtn);
-    auto* closeBtn = new QPushButton(QStringLiteral("✕ 关闭"), m_toolbar);
+    auto* closeBtn = new QPushButton(m_toolbar);
     closeBtn->setToolTip("关闭这个截图窗（Esc / 双击图片 也可以，右键是复制和另存为）");
     closeBtn->setCursor(Qt::PointingHandCursor);
-    closeBtn->setFixedWidth(60);
+    closeBtn->setAccessibleName(QStringLiteral("关闭"));
+    closeBtn->setIcon(actIcon(AiClose));
+    closeBtn->setFixedWidth(30);
     connect(closeBtn, &QPushButton::clicked, this, &PinWindow::close);
     lay->addWidget(closeBtn);
     refreshUndoBtn();
@@ -1046,9 +1135,25 @@ void PinWindow::buildToolbar()
 
 // 右键菜单：这张图最常做的两件事就是"再复制一遍"和"存成文件"，
 // 所以放到图上右键就能做，不用非看清底部工具栏那几个字。
+// 置顶窗两处右键菜单都从这颗函数拿。单独一颗的理由有两个：
+ // ① 样式**必须**挂上。置顶窗是独立顶层窗口，拿不到设置窗/搜索框各自那份 QMenu 样式表，而 Qt6 的
+ //    windows11 风格画弹出菜单用的是**系统**的浅色底 —— 于是白底压着我们的浅灰字，什么都看不见
+ //    （2026-10-17 他截图报的就是这个）。
+ // ② 真弹一下要占屏幕，自测没法验；把"建好一份"拆出来之后，判据量的是这个真对象，
+ //    不是探针自己另建的一份（第一版就错过一次：探针自己 new QMenu，改了也不变色，白绿）。
+QMenu* PinWindow::makeStyledMenu()
+{
+    auto* m = new QMenu(this);
+    m->setStyleSheet(Utils::darkMenuStyle());
+    return m;
+}
+
 void PinWindow::showContextMenu(const QPoint& globalPos)
 {
-    QMenu menu(this);
+    // 菜单从 makeStyledMenu() 拿（样式挂在那一颗里）。用 holder 是因为底下有
+    // 好几条 return 分支，手写 delete 迟早漏一条。
+    const std::unique_ptr<QMenu> holder(makeStyledMenu());
+    QMenu& menu = *holder;
     // 工具栏收起来的时候，图上右键只留两样：把工具栏叫回来、关掉这张。
     // 这时候人是要干净地看图，不该再被一排菜单挡一次。
     if (m_barHidden) {
@@ -1088,7 +1193,7 @@ void PinWindow::showContextMenu(const QPoint& globalPos)
         const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("另存为截图"),
                                                           def, QStringLiteral("PNG 图片 (*.png)"));
         if (!path.isEmpty() && m_pm.save(path))
-            Utils::revealInExplorer(path);
+            Platform::reveal(path);
     } else {
         close();
     }
@@ -1123,7 +1228,10 @@ QString PinWindow::deleteThumb(int index)
 
 void PinWindow::thumbContextMenu(int index, const QPoint& globalPos)
 {
-    QMenu menu(this);
+    // 菜单从 makeStyledMenu() 拿（样式挂在那一颗里）。用 holder 是因为底下有
+    // 好几条 return 分支，手写 delete 迟早漏一条。
+    const std::unique_ptr<QMenu> holder(makeStyledMenu());
+    QMenu& menu = *holder;
     QAction* del = menu.addAction(QStringLiteral("删除这一张"));
     if (menu.exec(globalPos) == del)
         deleteThumb(index);
@@ -1275,6 +1383,9 @@ void PinWindow::refreshUndoBtn()
     if (!m_undoBtn)
         return;
     m_undoBtn->setEnabled(!m_undo.isEmpty());
-    m_undoBtn->setText(m_undo.isEmpty() ? QStringLiteral("撤销")
-                                       : QString("撤销(%1)").arg(m_undo.size()));
+    // 图标按钮没有文字可改，可撤销的步数写进可访问名和悬停说明里
+    const QString what = m_undo.isEmpty() ? QStringLiteral("撤销（没得撤销了）")
+                                          : QStringLiteral("撤销（可撤销 %1 步）").arg(m_undo.size());
+    m_undoBtn->setAccessibleName(what);
+    m_undoBtn->setToolTip(what + QStringLiteral("（Ctrl+Z）"));
 }

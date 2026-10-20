@@ -67,16 +67,17 @@ ProbeResult probe(const QStringList& cmd);
 // 在"注册表里的 PATH"（机器 + 用户，已展开 %VAR%）中找某个命令对应的 exe；找不到返回空
 QString whichInRegistryPath(const QString& program);
 
-// 下载代理：配置页 [net] proxy 优先，没填就用 Windows 系统代理（IE/Edge 设置里那个）。
+// 下载代理：配置页 [net] proxy 优先，没填就用系统代理（Windows 是设置里那个静态代理，
+// POSIX 是 http_proxy / https_proxy 那一族环境变量 —— 这半在 platform/SysConfig.h）。
 // 返回空表示不用代理。形如 http://127.0.0.1:10808
 QString proxyUrl();
 QString systemProxyUrl();     // 只读系统设置，不读配置
 
-// 让 QNetworkAccessManager 用同一个代理（下载器、网站图标抓取都走这里）
+// 让 QNetworkAccessManager 用同一个代理（下载器、网站图标抓取、商店拉清单都走这里）
 void applyProxy(QNetworkAccessManager* nam);
 
 // 配置页里的安装目录（[install] path）；空字符串表示不指定 --location。
-// 配置的盘符在这台机器上不存在时（换机器/虚拟机/没插盘）退到 C 盘同一路径。
+// 「没配过」给平台默认的根，「配的盘符在这台机器上不存在」退到 C 盘 —— 两条都在缝里
 QString installLocation();
 
 // 安装目录：配置页的「安装目录」再套一层软件自己的子目录（subdirName），

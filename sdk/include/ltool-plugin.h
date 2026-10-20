@@ -28,8 +28,17 @@ class QSettings;
 // 按下之后把动作名+参数转给声明了接这个动作的插件。动作名就是原来那串命令行旗标去掉前导
 // 短横（capture / record / extract / extract-sub / compress-zip / compress-7z / shred /
 // usage / whohas），这样 ShellMenu 那套 verb 注册一个字都不用改。
-#define LTOOL_PLUGIN_API_VERSION 3
-#define LTOOL_PLUGIN_IID "com.mateoki.ltool.plugin/3.0"
+//
+// API 4（2026-10-20）：**接口一个字没改，改的是 core 那一侧。** 10-16 之后 core 公开的头里
+// `struct DiskScan::Tree` 多了两个 QString、`ClipboardStore` 多了 keepDays、`CaptureHistory`
+// 的行多了 key/pixmap，`Utils::launch/revealInExplorer/trimWorkingSet` 搬进了 platform 缝。
+// 这些都是**跨 dll 边界要被插件按偏移读的东西**：10-16 编的那批老插件名字全对得上、
+// `LoadLibrary` 也真成功，一按磁盘清理就 0xc0000005（事件日志故障模块 ltool-disk.dll 偏移 0x706a）。
+// 所以这一档号的作用只有一个：**让对不上老 core 的产物在这里被拒掉并说清原因，而不是进来崩**。
+// 升号的规矩由 `tools/core_abi_gate.py` 盯着（公开头动了布局却没升号 = CI 红），
+// 不靠人记得。iid 一起换：QPluginLoader 自己就会先拒一遍。
+#define LTOOL_PLUGIN_API_VERSION 4
+#define LTOOL_PLUGIN_IID "com.mateoki.ltool.plugin/4.0"
 
 struct LToolPlugin
 {

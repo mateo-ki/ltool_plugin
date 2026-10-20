@@ -6,6 +6,11 @@
 #include "UserAccount.h"
 
 #include <QCoreApplication>
+#include <QApplication>
+#include <QHBoxLayout>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QFileInfo>
 #include <QLabel>
 #include <QLayout>
@@ -138,5 +143,113 @@ int userPageSelftest()
     has("页面读完之后状态行填上了（不是停在「正在读」）",
         !state.isEmpty() && !state.contains(QStringLiteral("正在读")));
 
+    // ---- 形状（他挑的方案 B）：单列到底、动作一律在行尾、第一下不弹框也不把上面挪走 ----
+    int rowEndActions = 0;
+    for (QHBoxLayout* r : page.findChildren<QHBoxLayout*>()) {
+        if (r->count() == 0)
+            continue;
+        QLayoutItem* end = r->itemAt(r->count() - 1);
+        const QPushButton* b = qobject_cast<const QPushButton*>(end ? end->widget() : nullptr);
+        if (b && (b->objectName() == QLatin1String("applyFull")
+                  || b->objectName() == QLatin1String("applyName")
+                  || b->objectName() == QLatin1String("applyCreate")
+                  || b->objectName() == QLatin1String("reload")))
+            ++rowEndActions;
+    }
+    check("四个动作都在自己那行的末尾（改显示名/改账户名/新建/重读）",
+          QString::number(rowEndActions), QStringLiteral("4"));
+    // 只断言"一行摆完"这一件形状上的事：内容里有几个字段是机器相关的（本地/微软账户），
+    // 拿它当期望值会在 CI 那台_runner_上红得莫名其妙
+    has("摘要行是一行摆完的（方案 B 不竖着列六行）", !state.contains(QChar(10)));
+
+    // 几何断言：先把版面撑开量一遍，再点"改账户名"的第一下，上面那些一颗都不许挪。
+    // 这里只点一下（摆出确认），绝不会点第二下 —— 第二下会真去提权弹 UAC，那不可逆。
+    page.resize(560, 320);
+    page.ensurePolished();
+    if (page.layout())
+        page.layout()->activate();
+    const auto yOf = [&page](const char* objName) {
+        QWidget* w = page.findChild<QWidget*>(QString::fromLatin1(objName));
+        return w ? w->y() : -1;
+    };
+    const int yFull = yOf("applyFull"), yGap = yOf("newName"), yAdmin = yOf("newAdmin");
+    std::printf("INFO 量到的行位置：改显示名=%d 新建登录名=%d 管理员那行=%d（页面 %dx%d）\n",
+                yFull, yGap, yAdmin, page.width(), page.height());
+    // 先证明"版面对我露出过真坐标"：三个 y 必须是互不相同的正数。
+    // 不钉这一条的话，布局没排开时三个 y 全是 0，下面那条"没挪走"就在 0==0 上空转（装饰性的绿）
+    has("离屏版面真的排开了（三行的 y 是互不相同的正数）",
+        yFull > 0 && yGap > yFull && yAdmin > yGap);
+    QLineEdit* nameIn = page.findChild<QLineEdit*>(QString::fromLatin1("nameInput"));
+    QPushButton* nameBtn = page.findChild<QPushButton*>(QString::fromLatin1("applyName"));
+    // 点之前先等页面自己把两颗按钮放开（那是"后台那次读到了"的唯一信号）。
+    // CI 那台 runner 上 powershell 起得慢，不等就是对着禁用态的按钮 click()：空操作，
+    // 于是"点第一下摆出确认"红、而"收回原字"假绿（没武装过也等于收回了）—— 2026-10-17 就这样红过。
+    bool ready = false;
+    for (int i = 0; i < 250 && !ready; ++i) {
+        QCoreApplication::processEvents();
+        QThread::msleep(20);
+        ready = nameBtn && nameBtn->isEnabled();
+    }
+    if (!ready) {
+        std::printf("SKIP 就地两段确认那 4 条：页面 5 秒内没读到账户信息（按钮还在禁用态），"
+                    "对着禁用按钮 click() 量不到任何东西\n");
+        check("读不到账户时两颗按钮是禁用态（不许按）",
+              nameBtn && !nameBtn->isEnabled() ? QStringLiteral("yes") : QStringLiteral("no"),
+              QStringLiteral("yes"));
+    }
+    const bool armed = nameIn && nameBtn && ready;
+    if (armed) {
+        const QString orig = nameBtn->text();
+        // 拿读到的真账户名改一个字母：既要和现在不一样（才不会被"没变"那条挡回来），
+        // 又要过得去校验（长度 ≤20、没有那些非法字符）
+        nameIn->setText(me.name.left(10) + QStringLiteral("z"));
+        nameBtn->click();                                              // 程序内触发，不碰他的鼠标键盘
+        check("点第一下只摆出确认（按钮换了字，没动手）",
+              nameBtn->text() != orig ? QStringLiteral("yes") : QStringLiteral("no"),
+              QStringLiteral("yes"));
+        check("确认说明写在页内那一行上（不是弹出来的框）",
+              QApplication::activeModalWidget() == nullptr ? QStringLiteral("yes")
+                                                           : QStringLiteral("no"),
+              QStringLiteral("yes"));
+        // 点了之后必须先让布局重排再读坐标 —— 不重排读到的是旧几何，
+        // 那条判据就会在"永远相等"上空转（2026-10-17 我就是这样被骗过一次，
+        // 拿"点一下插一块进去"的破坏试验才照出来）
+        for (int i = 0; i < 10; ++i) {
+            page.layout()->invalidate();
+            page.layout()->activate();
+            QCoreApplication::processEvents();
+        }
+        check("第一下不许把上面任何一颗挪走（改显示名/新建/管理员行 y 不变）",
+              (yOf("applyFull") == yFull && yOf("newName") == yGap && yOf("newAdmin") == yAdmin)
+                  ? QStringLiteral("yes") : QStringLiteral("no"),
+              QStringLiteral("yes"));
+        // 武装只留一颗：再点另一颗，前一颗必须收回原字
+        QPushButton* fullBtn = page.findChild<QPushButton*>(QString::fromLatin1("applyFull"));
+        if (fullBtn) {
+            QLineEdit* fullIn = page.findChild<QLineEdit*>(QString::fromLatin1("fullInput"));
+            if (fullIn)
+                fullIn->setText(QString::fromUtf8("对照名"));
+            const QString origFull = fullBtn->text();
+            fullBtn->click();
+            check("武装只留一颗（点另一颗会把前一颗收回原字）",
+                  nameBtn->text() == orig ? QStringLiteral("yes") : QStringLiteral("no"),
+                  QStringLiteral("yes"));
+            // **绝不允许对同一颗按钮点第二下**：第二下就是"确认"，会真去提权改账户。
+            // 2026-10-17 我犯过一次 —— 以为在"收回"，实际把「改显示名」提交了
+            //（他账户幸运地以退出码 1 失败、没被改动）。收回只能靠点另一颗：
+            // 这里点回 applyName，它把 applyFull 收回、自己武装起来，测试到此为止。
+            nameIn->setText(me.name.left(9) + QStringLiteral("zz"));
+            nameBtn->click();
+            // 收尾这条量的是"同时只有一颗在武装"：点回 applyName 之后 applyFull 收回、
+            // applyName 武装 —— 安全靠的是结构（这段里没有一处对同一颗点第二下），
+            // 不是靠这条断言，所以它写得很明白，别把它当成防线
+            check("收尾：前一颗收回原字、同时只有一颗停在武装态",
+                  (fullBtn->text() == origFull && nameBtn->text() != orig)
+                      ? QStringLiteral("yes") : QStringLiteral("no"),
+                  QStringLiteral("yes"));
+        }
+    }
+    has("这页已经不再创建任何 QMessageBox（模态框那一类彻底没了）",
+        page.findChildren<QMessageBox*>().isEmpty());
     return bad;
 }

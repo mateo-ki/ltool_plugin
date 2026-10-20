@@ -1,4 +1,5 @@
 #include "StartupPage.h"
+#include "platform/Launch.h"
 
 #include "InfoRow.h"
 #include "StartupAudit.h"
@@ -329,6 +330,6 @@ void StartupPage::exportReport()
                                                          it.signatureValid ? "通过" : "未通过"));
     }
     f.close();
-    Utils::revealInExplorer(path);
+    Platform::reveal(path);
     m_status->setText(QStringLiteral("报告已导出：%1").arg(path));
 }

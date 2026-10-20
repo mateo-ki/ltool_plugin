@@ -3,6 +3,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
@@ -573,12 +574,18 @@ DiskPage::DiskPage(QWidget* parent)
     m_analyzeBtn->setToolTip("扫描常见可清理位置的占用，并分析所选磁盘各目录占用");
     m_cleanBtn = new QPushButton("清理选中项", this);
     m_cleanBtn->setEnabled(false);   // 扫出结果前不给清理，避免空列表也去清空回收站
+    m_mftBtn = new QPushButton("直读 MFT 重扫", this);
+    m_mftBtn->setObjectName("mftBtn");
+    m_mftBtn->setAccessibleName("mftBtn");
+    m_mftBtn->setToolTip("整盘的结构和大小直接从 NTFS 的 $MFT 里读，一个目录都不进，比「整理」快一个数量级。\n"
+                         "读卷要管理员权限：会弹一次 UAC，起来的子进程只读，不改动盘上任何东西。");
     m_status = new QLabel(this);
     m_status->setObjectName("muted");
     m_status->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     actions->addWidget(driveLabel);
     actions->addWidget(m_drive);
     actions->addWidget(m_analyzeBtn);
+    actions->addWidget(m_mftBtn);
     actions->addWidget(m_cleanBtn);
     actions->addWidget(m_status, 1);
 
@@ -651,6 +658,7 @@ DiskPage::DiskPage(QWidget* parent)
     outer->addWidget(m_stack, 1);
 
     connect(m_analyzeBtn, &QPushButton::clicked, this, &DiskPage::startAll);
+    connect(m_mftBtn, &QPushButton::clicked, this, &DiskPage::mftRescan);
     connect(m_cleanBtn, &QPushButton::clicked, this, &DiskPage::cleanSelected);
     connect(m_upBtn, &QPushButton::clicked, this, &DiskPage::analysisUp);
 
@@ -725,6 +733,7 @@ void DiskPage::startAll()
     m_tree.reset();
     m_cleanPhase = 0;
     m_analyzeBtn->setEnabled(false);
+    m_mftBtn->setEnabled(false);
     m_drive->setEnabled(false);   // 扫描中途换盘会让树上的数字和界面说的盘对不上
     m_upBtn->setEnabled(false);
     m_analysisPath->setText(QString("正在统计可清理位置…（整个 %1 的占用分析要再等十几秒）")
@@ -756,6 +765,7 @@ void DiskPage::startAll()
                 task->dirs.store(p.dirs, std::memory_order_relaxed);
                 const std::lock_guard<std::mutex> g(task->m);
                 task->current = p.current;
+                task->engine = p.engine;
                 task->branches = p.doneBranches;
                 task->branchTotal = p.branches;
             }));
@@ -782,20 +792,26 @@ void DiskPage::tick()
         const qint64 bytes = m_task->bytes.load(std::memory_order_relaxed);
         const qint64 dirs = m_task->dirs.load(std::memory_order_relaxed);
         QString cur;
+        QString eng;
         int doneBranches = 0;
         int totalBranches = 0;
         {
             const std::lock_guard<std::mutex> g(m_task->m);
             cur = m_task->current;
+            eng = m_task->engine;
             doneBranches = m_task->branches.size();
             totalBranches = m_task->branchTotal;
         }
-        const QString text = QString("已统计 %1 / %2 个目录 · 一级分支已扫完 %3 / %4%5")
-                                 .arg(human(bytes))
-                                 .arg(dirs)
-                                 .arg(doneBranches)
-                                 .arg(totalBranches)
-                                 .arg(cur.isEmpty() ? QString() : QString(" · 正在 %1").arg(cur));
+        // MFT 那条路报的是"已经枚举出多少条记录"，跟"已经统计多少个目录"不是一回事，
+        // 两套话不能混在同一行里（混了就是假数字）
+        const QString text = eng == DiskScan::engineMft()
+            ? (cur.isEmpty() ? QStringLiteral("正在直读 $MFT…") : cur)
+            : QString("已统计 %1 / %2 个目录 · 一级分支已扫完 %3 / %4%5")
+                  .arg(human(bytes))
+                  .arg(dirs)
+                  .arg(doneBranches)
+                  .arg(totalBranches)
+                  .arg(cur.isEmpty() ? QString() : QString(" · 正在 %1").arg(cur));
         m_analysisStatus->setText(text);
         renderBranches();       // 已经定稿的一级分支先摆出来（整盘要十几秒，别干等）
         if (m_cleanPhase < 2)
@@ -810,6 +826,8 @@ void DiskPage::tick()
         m_scannedAt.insert(m_root, QDateTime::currentDateTime());
     }
     m_analyzeBtn->setEnabled(true);
+    // 提权那颗只在"没有一趟扫描在飞"的时候给按：两条路一起改同一棵树会打架
+    m_mftBtn->setEnabled(!m_mftBusy);
     m_drive->setEnabled(true);
     if (!m_tree || m_tree->isEmpty()) {
         m_analysisPath->setText("遍历失败（权限或路径问题）");
@@ -882,6 +900,94 @@ void DiskPage::showCached(const QString& root)
                                      m_scannedAt.value(root).toString("MM-dd hh:mm:ss")));
 }
 
+namespace {
+
+// 起一个**提权的自己**把整盘读出来（`ltool.exe --mftree <盘> <文件>`），等它退出，拿退出码。
+// 为什么不干脆让 ltool 平时就提权跑：它是个启动器，热键天天按，不该张口就要管理员。
+// 所以只有这一趟读要授权，而那个子进程只做一件事：读、写一个文件、退出。
+int runElevatedTreeDump(const QString& root, const QString& out, QString* err)
+{
+    const QString exe = QCoreApplication::applicationFilePath();
+    const QString params = QStringLiteral("--mftree %1 \"%2\"").arg(root, out);
+    SHELLEXECUTEINFOW sei = {};
+    sei.cbSize = sizeof(sei);
+    sei.lpVerb = L"runas";
+    sei.lpFile = reinterpret_cast<LPCWSTR>(exe.utf16());
+    sei.lpParameters = reinterpret_cast<LPCWSTR>(params.utf16());
+    sei.nShow = SW_HIDE;
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    if (!ShellExecuteExW(&sei)) {
+        const DWORD e = GetLastError();
+        if (err)
+            *err = e == ERROR_CANCELLED ? QStringLiteral("没给管理员授权，这趟没读")
+                                        : QStringLiteral("提权进程没起来（错误码 %1）").arg(e);
+        return -1;
+    }
+    DWORD rc = 1;
+    if (sei.hProcess) {
+        WaitForSingleObject(sei.hProcess, 180000);   // 整盘枚举 + 一遍 $MFT + 写文件，给三分钟
+        GetExitCodeProcess(sei.hProcess, &rc);
+        CloseHandle(sei.hProcess);
+    }
+    return int(rc);
+}
+
+} // namespace
+
+// 「直读 MFT 重扫」：这一趟的数字来自 $MFT，一个目录都不进。
+// 卷只有管理员读得了，所以走"起一个提权的自己 → 它写一份快照 → 这边读回来"。
+void DiskPage::mftRescan()
+{
+    if (m_mftBusy || m_task)
+        return;             // 有一趟扫描在飞：别让两条路一起改同一棵树
+    const QString root = m_root;
+    // 文件名在这算好、两边共用；收尾时也只删这一个名字算出来的路径
+    const QString out = QDir::tempPath()
+                        + QStringLiteral("/ltool-mftree-%1.bin")
+                              .arg(QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz"));
+    m_mftBusy = true;
+    m_mftBtn->setEnabled(false);
+    m_analysisStatus->setText(QStringLiteral("正在等 UAC：起来的是个只读的子进程，不改动盘上任何东西…"));
+    Utils::log(QStringLiteral("disk: 直读 MFT 请求提权 root=%1").arg(root));
+    std::thread([this, root, out] {
+        QString err;
+        const int rc = runElevatedTreeDump(root, out, &err);
+        auto tree = std::make_shared<DiskScan::Tree>(
+            rc == 0 ? DiskScan::readTree(out, &err) : DiskScan::Tree());
+        QFile::remove(out);
+        QMetaObject::invokeMethod(
+            this, [this, root, tree, rc, err] { applyMftTree(root, *tree, rc, err); },
+            Qt::QueuedConnection);
+    }).detach();
+}
+
+void DiskPage::applyMftTree(const QString& root, const DiskScan::Tree& t, int rc, const QString& err)
+{
+    m_mftBusy = false;
+    if (root != m_root)
+        return;             // 期间换了盘：这份结果不属于当前视图，缓存也不该被别的盘污染
+    m_mftBtn->setEnabled(true);
+    if (rc != 0 || t.isEmpty()) {
+        const QString why = !err.isEmpty()
+                                ? err
+                                : rc == 2
+                                      ? QStringLiteral("这个卷走不了 MFT 直读（没提权、不是 NTFS、或没开 USN 日志）")
+                                      : QStringLiteral("提权进程退出码 %1").arg(rc);
+        m_analysisStatus->setText(QStringLiteral("直读 MFT 没成：%1").arg(why));
+        Utils::log(QStringLiteral("disk: 直读 MFT 失败 rc=%1 why=%2").arg(rc).arg(why));
+        return;
+    }
+    m_tree = std::make_shared<DiskScan::Tree>(t);
+    m_byDrive.insert(root, m_tree);
+    m_scannedAt.insert(root, QDateTime::currentDateTime());
+    m_node = m_tree->root;
+    m_cleanPhase = 2;
+    renderAnalysis();
+    renderCleanFromTree();
+    Utils::log(QStringLiteral("disk: 直读 MFT 成功，%1 个目录，合计 %2")
+                   .arg(m_tree->name.size()).arg(human(m_tree->total)));
+}
+
 void DiskPage::showNode(int node)
 {
     if (!m_tree || node < 0 || node >= m_tree->name.size())
@@ -929,6 +1035,13 @@ void DiskPage::renderAnalysis()
         status += QString("（列表只显示前 %1，矩形图里全都有）").arg(shown);
     if (m_node == t.root && t.pruned > 0)
         status += QString("，另有 %1 个小于 1 MB 的目录未列出").arg(t.pruned);
+    if (m_node == t.root && !t.engine.isEmpty()) {
+        // 同一句"扫完了"背后可能差一个数量级（MFT 直读 2 秒 / 遍历 19 秒），
+        // 走的是哪条、为什么没走快的那条，都摆在这行里，别让人猜
+        status += QString(" · %1%2").arg(t.engine, t.engineNote.isEmpty()
+                                                    ? QString()
+                                                    : QString("（%1）").arg(t.engineNote));
+    }
     if (m_node == t.root && m_scannedAt.contains(m_root))
         status += QString(" · 上次扫描 %1").arg(m_scannedAt.value(m_root).toString("hh:mm:ss"));
     m_analysisStatus->setText(status);
@@ -1130,9 +1243,10 @@ int diskUiSelftest()
     auto* status = qobject_cast<QLabel*>(findByAcc(&page, "analysisStatus"));
     auto* path = qobject_cast<QLabel*>(findByAcc(&page, "analysisPath"));
     auto* drive = qobject_cast<QComboBox*>(findByAcc(&page, "driveBox"));
-    say("按钮、两条状态、盘符下拉都找得到", btn && status && path && drive,
-        QStringLiteral("btn=%1 status=%2 path=%3 drive=%4")
-            .arg(bool2s(btn), bool2s(status), bool2s(path), bool2s(drive)));
+    auto* mftBtn = qobject_cast<QPushButton*>(findByAcc(&page, "mftBtn"));
+    say("按钮（整理 / 直读 MFT）、两条状态、盘符下拉都找得到", btn && mftBtn && status && path && drive,
+        QStringLiteral("btn=%1 mftBtn=%2 status=%3 path=%4 drive=%5")
+            .arg(bool2s(btn), bool2s(mftBtn), bool2s(status), bool2s(path), bool2s(drive)));
     if (!btn || !status || !path || !drive)
         return bad ? bad : 1;
 
@@ -1146,8 +1260,11 @@ int diskUiSelftest()
         QCoreApplication::processEvents();
         QThread::msleep(30);
         const QString s = status->text();
-        sawBranch = s.contains(QString::fromUtf8("一级分支已扫完"))
-                    && !s.contains(QString::fromUtf8("已扫完 0 /"));
+        // 两条路各报各的：遍历报"一级分支已扫完 N"，MFT 直读报"已枚举多少条记录"。
+        // 判据认的是"途中状态行在动"，不是某一条路的措辞 —— 提权跑就会走 MFT。
+        sawBranch = (s.contains(QString::fromUtf8("一级分支已扫完"))
+                     && !s.contains(QString::fromUtf8("已扫完 0 /")))
+                    || s.contains(QString::fromUtf8("MFT 直读"));
     }
     const qint64 firstMs = t.elapsed();
     say("扫描途中状态行报了「已扫完 N 个一级分支」", sawBranch,
@@ -1168,6 +1285,11 @@ int diskUiSelftest()
         QStringLiteral("%1ms · %2 / %3").arg(t.elapsed()).arg(path->text(), status->text()));
     const int afterRows = rowCountOf(&page);
     say("定稿后列表有东西", afterRows > 0, QStringLiteral("%1 行").arg(afterRows));
+    // 状态行必须说清这数字是哪条路给的：MFT 直读两秒、遍历十几秒，同一句"扫完了"差一个数量级
+    const QString st = status->text();
+    say("定稿的状态行点名了这次走的是哪条路",
+        st.contains(DiskScan::engineMft()) || st.contains(DiskScan::engineWalk()),
+        QStringLiteral("[%1]").arg(st));
 
     // 第三段：换盘再换回来 —— 该直接用缓存，不该重扫，也不该把行弄丢
     if (drive->count() < 2) {

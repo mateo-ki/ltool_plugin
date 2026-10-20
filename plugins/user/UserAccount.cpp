@@ -5,17 +5,18 @@
 #include <QDir>
 #include <QCheckBox>
 #include <QFile>
-#include <QMessageBox>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QLineEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QTemporaryFile>
 #include <QTextEdit>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QFutureWatcher>
 #include <QtConcurrent/QtConcurrentRun>
-#include <QFormLayout>
 #include <QLabel>
 
 #include <windows.h>
@@ -290,16 +291,29 @@ bool runElevatedScript(const QString& script, QString* err)
 
 namespace {
 
+// 每一步停在哪个口子都要留一行日志。这条链后面还有 UAC、脚本、回读三段，
+// "日志里有没有 username: 这行"就是分界线 —— 2026-10-17 他报"改用户名失败"，
+// 而整份 log 里 username: 一条都没有（同期 linuxdo: 307 行、clipboard: 534 行，
+// 说明插件写日志的通路是好的）⇒ 根本没走到提权，但到底是哪个口子拦的没有证据。
+void stoppedAt(const QString& action, const QString& gate, const QString& detail = {})
+{
+    Utils::log(QStringLiteral("username: %1 停在%2%3")
+                   .arg(action, gate,
+                        detail.isEmpty() ? QString() : QStringLiteral(" — ") + detail));
+}
+
+// 摘要行：方案 B 要单列，所以一行摆完（判据认这行里要有「账户名」三个字）。
+// SID 太长，截到最后一个连字符段就够认人了；完整 SID 在悬停里。
 QString oneLiner(const UserAccount::Info& i)
 {
-    return QStringLiteral(
-               "账户名：%1\n机器名：%2\n显示名：%3\n类型：%4\n用户目录：%5\nSID：%6")
+    return QStringLiteral("账户名 %1 @ %2 · %3 · 显示名 %4 · %5")
         .arg(i.name, i.machine,
-             i.fullName.isEmpty() ? QStringLiteral("（没设，界面显示的就是账户名）") : i.fullName,
-             i.local ? (i.msaHint ? QStringLiteral("本地账户（另外还读到微软账户的登录痕迹）")
+             i.local ? (i.msaHint ? QStringLiteral("本地账户（另有微软账户登录痕迹）")
                                    : QStringLiteral("本地账户"))
-                     : QStringLiteral("SAM 里查不到这个名（多半是微软账户）"),
-             i.profileDir, i.sid);
+                     : QStringLiteral("SAM 里查不到（多半是微软账户）"),
+             i.fullName.isEmpty() ? QStringLiteral("（没设）") : QStringLiteral("「%1」").arg(i.fullName),
+             i.profileDir)
+        + QStringLiteral(" · SID %1").arg(i.sid.section(QLatin1Char('-'), 0, 4));
 }
 
 } // namespace
@@ -307,62 +321,94 @@ QString oneLiner(const UserAccount::Info& i)
 UserAccountPage::UserAccountPage(QWidget* parent) : QWidget(parent)
 {
     auto* lay = new QVBoxLayout(this);
-    lay->setContentsMargins(4, 4, 4, 4);
+    lay->setContentsMargins(10, 10, 10, 10);
     lay->setSpacing(8);
 
+    // ---- 形状：方案 B（单列到底，动作一律在行尾）----
+    // 摘要行 + 行尾「重读」
+    auto* head = new QHBoxLayout;
+    head->setSpacing(8);
     m_state = new QLabel(this);
     m_state->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    lay->addWidget(m_state);
+    head->addWidget(m_state, 1);
+    auto* reload = new QPushButton(QStringLiteral("重读"), this);
+    reload->setObjectName(QStringLiteral("reload"));
+    head->addWidget(reload);
+    lay->addLayout(head);
 
+    // 话只有一行，而且常驻：三颗按钮的过程和结果都写在这里，不再另开模态框。
+    // 位置在所有动作行**下面**：这条会换文字、可能从一行变两行，摆在上面的话一按就把
+    // 输入框和按钮往下推（他否过"点一下版面重新排"）；摆在底下，上面那些一颗都不动。
     m_hint = new QLabel(this);
     m_hint->setObjectName(QStringLiteral("muted"));
     m_hint->setWordWrap(true);
-    lay->addWidget(m_hint);
+    m_hint->setText(QStringLiteral("改显示名只动登录界面/开始菜单那个名字；改账户名不动 C:\\Users 目录，"
+                                  "要注销再登才全面生效。三个动作都要管理员授权（会弹 UAC）。"));
 
-    auto* box = new QFormLayout;
-    box->setSpacing(6);
+    auto* rowFull = new QHBoxLayout;
+    rowFull->setSpacing(8);
     m_full = new QLineEdit(this);
+    m_full->setObjectName(QStringLiteral("fullInput"));
     m_full->setPlaceholderText(QStringLiteral("显示名：登录界面和开始菜单里那个名字"));
     m_applyFull = new QPushButton(QStringLiteral("改显示名"), this);
     m_applyFull->setObjectName(QStringLiteral("applyFull"));
+    rowFull->addWidget(m_full, 1);
+    rowFull->addWidget(m_applyFull);
+    lay->addLayout(rowFull);
+
+    auto* rowName = new QHBoxLayout;
+    rowName->setSpacing(8);
     m_name = new QLineEdit(this);
+    m_name->setObjectName(QStringLiteral("nameInput"));
     m_name->setPlaceholderText(QStringLiteral("账户名：最长 20 个字符，改了不会动 C:\\Users 目录"));
     m_applyName = new QPushButton(QStringLiteral("改账户名"), this);
     m_applyName->setObjectName(QStringLiteral("applyName"));
-    box->addRow(QStringLiteral("显示名"), m_full);
-    box->addRow(QString(), m_applyFull);
-    box->addRow(QStringLiteral("账户名"), m_name);
-    box->addRow(QString(), m_applyName);
-    lay->addLayout(box);
+    rowName->addWidget(m_name, 1);
+    rowName->addWidget(m_applyName);
+    lay->addLayout(rowName);
 
-    // ---- 新建用户这一段：和上面两个是不同性质的事（那是改自己，这是造一个新账户），
-    //      所以单独一组、单独一颗按钮，别混在同一排里 ----
-    auto* createBox = new QFormLayout;
-    createBox->setSpacing(6);
+    // 「改自己」和「新建账户」是两种性质的事，中间要有一条看得见的界
+    auto* gap = new QFrame(this);
+    gap->setFrameShape(QFrame::HLine);
+    gap->setFrameShadow(QFrame::Plain);
+    lay->addWidget(gap);
+
+    auto* rowNew = new QHBoxLayout;
+    rowNew->setSpacing(8);
     m_newName = new QLineEdit(this);
     m_newName->setObjectName(QStringLiteral("newName"));
     m_newName->setPlaceholderText(QStringLiteral("新账户的登录名（最长 20 个字符）"));
     m_newFull = new QLineEdit(this);
     m_newFull->setObjectName(QStringLiteral("newFull"));
-    m_newFull->setPlaceholderText(QStringLiteral("显示名（可留空，留空就用登录名）"));
+    m_newFull->setPlaceholderText(QStringLiteral("新账户显示名（留空就用登录名）"));
     m_newPass = new QLineEdit(this);
     m_newPass->setObjectName(QStringLiteral("newPass"));
     m_newPass->setEchoMode(QLineEdit::Password);
     m_newPass->setPlaceholderText(QStringLiteral("密码（必填）"));
-    m_newAdmin = new QCheckBox(QStringLiteral("赋予管理员权限（加入 Administrators 组）"), this);
-    m_newAdmin->setObjectName(QStringLiteral("newAdmin"));
-    m_newAdmin->setChecked(true);
     m_create = new QPushButton(QStringLiteral("新建用户"), this);
     m_create->setObjectName(QStringLiteral("applyCreate"));
-    createBox->addRow(QStringLiteral("新账户名"), m_newName);
-    createBox->addRow(QStringLiteral("新显示名"), m_newFull);
-    createBox->addRow(QStringLiteral("密码"), m_newPass);
-    createBox->addRow(QString(), m_newAdmin);
-    createBox->addRow(QString(), m_create);
-    lay->addLayout(createBox);
+    rowNew->addWidget(m_newName, 2);
+    rowNew->addWidget(m_newFull, 2);
+    rowNew->addWidget(m_newPass, 2);
+    rowNew->addWidget(m_create);
+    lay->addLayout(rowNew);
 
-    auto* reload = new QPushButton(QStringLiteral("重新读一遍"), this);
-    lay->addWidget(reload);
+    m_newAdmin = new QCheckBox(QStringLiteral("给这个新账户管理员权限（加入 Administrators 组）"), this);
+    m_newAdmin->setObjectName(QStringLiteral("newAdmin"));
+    m_newAdmin->setChecked(true);
+    lay->addWidget(m_newAdmin);
+
+    m_armTimer = new QTimer(this);
+    m_armTimer->setSingleShot(true);
+    connect(m_armTimer, &QTimer::timeout, this, [this] {
+        if (!m_armed)
+            return;
+        Utils::log(QStringLiteral("username: %1 六秒没再点，确认收回").arg(m_armed->objectName()));
+        disarm();
+        m_hint->setText(QStringLiteral("没动手：六秒内没再点第二下，确认已经收回。"));
+    });
+
+    lay->addWidget(m_hint);
     lay->addStretch(1);
 
     connect(m_applyFull, &QPushButton::clicked, this, &UserAccountPage::applyFullName);
@@ -391,6 +437,7 @@ void UserAccountPage::refresh()
 
 void UserAccountPage::applyInfo(const UserAccount::Info& got)
 {
+    disarm();
     m_info = got;
     if (!m_info.readable) {
         m_state->setText(QStringLiteral("读不到账户信息：%1").arg(m_info.error));
@@ -399,36 +446,71 @@ void UserAccountPage::applyInfo(const UserAccount::Info& got)
         return;
     }
     m_state->setText(oneLiner(m_info));
+    m_state->setToolTip(m_info.sid);            // 摘要行只放截过的 SID，完整那串在悬停里
     m_full->setText(m_info.fullName);
     m_name->setText(m_info.name);
     m_applyFull->setEnabled(true);
+    // 微软账户在 SAM 里查不到，Rename-LocalUser 对它没意义：那一颗直接不给按，
+    // 并在旁边说清去哪儿改（不是把失败藏到按下之后）
     m_applyName->setEnabled(m_info.local);
-    m_hint->setText(QStringLiteral(
-        "改显示名只动登录界面/开始菜单显示的那个名字，最安全。"
-        "改账户名影响的是登录用的名字本身：C:\Users 下面那个目录不会跟着改名，"
-        "已经写死了旧路径的程序不会自动跟上，改完要注销再登才全生效。"
-        "如果这是微软账户，显示名是服务器同步下来的，本地改了也会被覆盖，"
-        "得去 account.microsoft.com 改。三个动作都要管理员授权（会弹 UAC）。"));
+}
+
+// 就地两段确认：第一下把同一颗按钮变成「确认…」并亮 6 秒，第二下才真动手。
+//
+// 为什么不用模态确认框（这是这次的实际修法，不只是审美）：这页是从启动器里叫出来的，
+// 启动器一失焦就把自己藏起来，挂在它里面的模态框跟着看不见，答案算「不是」——
+// 实测整份日志里 username: 一条都没有（同期 linuxdo: 307 行、clipboard: 534 行，
+// 说明插件写日志的通路是好的）：三颗按钮按下去哪儿也没去。
+//
+// 按钮在行尾，文字变长只会往左挤输入框：行高不变、块数不变（他否过"点一下突然多出一块"）。
+bool UserAccountPage::armOrRun(QPushButton* btn, const QString& confirmText, const QString& risk)
+{
+    if (m_armed == btn) {
+        disarm();
+        return true;
+    }
+    disarm();
+    m_armedText = btn->text();
+    m_armed = btn;
+    btn->setText(confirmText);
+    m_hint->setText(risk);
+    m_armTimer->start(6000);
+    Utils::log(QStringLiteral("username: %1 摆出两段确认（再点一下才动手）").arg(btn->objectName()));
+    return false;
+}
+
+void UserAccountPage::disarm()
+{
+    if (!m_armed)
+        return;
+    m_armed->setText(m_armedText);
+    m_armed = nullptr;
+    m_armTimer->stop();
+}
+
+// 校验没过就写在同一行说明上，不再弹框：弹框在这个页上是会被隐藏的启动器吞掉的那一类东西
+void UserAccountPage::refused(const QString& action, const QStringList& why)
+{
+    stoppedAt(action, "校验", why.join(QStringLiteral("；")));
+    m_hint->setText(QStringLiteral("%1 没动：%2").arg(action, why.join(QStringLiteral("；"))));
 }
 
 void UserAccountPage::applyFullName()
 {
     const QString want = m_full->text();
     if (want.trimmed() == m_info.fullName) {
+        stoppedAt("改显示名", "名字没变");
         m_hint->setText(QStringLiteral("显示名没变，什么都没做。"));
         return;
     }
     const QStringList why = UserAccount::reject(want, false);
     if (!why.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("改显示名"), why.join(QLatin1Char('\n')));
+        refused(QStringLiteral("改显示名"), why);
         return;
     }
-    if (QMessageBox::question(this, QStringLiteral("改显示名"),
-                              QStringLiteral("把登录界面显示的名字从「%1」改成「%2」？\n"
-                                             "不动账户名，也不动 C:\\Users 目录。")
-                                  .arg(m_info.fullName.isEmpty() ? m_info.name : m_info.fullName,
-                                       want.trimmed()))
-        != QMessageBox::Yes)
+    if (!armOrRun(m_applyFull, QStringLiteral("确认改成这个"),
+                  QStringLiteral("第二下才会提交：只改登录界面/开始菜单显示的名字，"
+                                 "不动账户名，也不动 C:\\Users 目录。要管理员授权。")))
         return;
     QString err;
     const bool ran = UserAccount::runElevatedScript(
@@ -449,21 +531,19 @@ void UserAccountPage::applyAccountName()
 {
     const QString want = m_name->text();
     if (want.trimmed() == m_info.name) {
+        stoppedAt("改账户名", "名字没变");
         m_hint->setText(QStringLiteral("账户名没变，什么都没做。"));
         return;
     }
     const QStringList why = UserAccount::reject(want, true);
     if (!why.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("改账户名"), why.join(QLatin1Char('\n')));
+        refused(QStringLiteral("改账户名"), why);
         return;
     }
-    if (QMessageBox::question(this, QStringLiteral("改账户名"),
-                              QStringLiteral("要把登录用的账户名从「%1」改成「%2」。\n\n"
-                                             "· C:\\Users\\%1 这个目录**不会**跟着改名\n"
-                                             "· 写死了旧路径的程序/脚本不会自动跟上\n"
-                                             "· 改完要注销重新登录\n\n确认继续吗？")
-                                  .arg(m_info.name, want.trimmed()))
-        != QMessageBox::Yes)
+    if (!armOrRun(m_applyName, QStringLiteral("确认改名"),
+                  QStringLiteral("第二下才会提交：C:\\Users\\%1 那个目录不会跟着改名，写死了旧路径的"
+                                 "程序也不会自己跟上；改完要注销再登录才全面生效。要管理员授权。")
+                      .arg(m_info.name)))
         return;
     QString err;
     const bool ran = UserAccount::runElevatedScript(
@@ -472,14 +552,14 @@ void UserAccountPage::applyAccountName()
     refresh();
     const bool now = (m_info.name == want.trimmed());
     m_hint->setText(now ? QStringLiteral("账户名已改成「%1」（回读确认）。注销再登录后全面生效；"
-                                          "用户目录还是 %2。")
+                                         "C:\\Users\\%2 那个目录还是旧名字。")
                               .arg(m_info.name, before)
-                        : QStringLiteral("没改成：回读到的还是「%1」。%2")
+                        : QStringLiteral("没改成：现在读到的是「%1」。%2")
                               .arg(m_info.name, ran ? QStringLiteral("脚本跑成功了但名字没变") : err));
     Utils::log(QStringLiteral("username: 改账户名 %1→%2 ok=%3 err=%4")
-                   .arg(before, m_info.name).arg(now ? 1 : 0).arg(ran ? QStringLiteral("ok") : err));
+                   .arg(before, want.trimmed()).arg(now ? 1 : 0)
+                   .arg(ran ? QStringLiteral("ok") : err));
 }
-
 
 void UserAccountPage::createNewUser()
 {
@@ -492,20 +572,17 @@ void UserAccountPage::createNewUser()
     if (why.isEmpty() && UserAccount::probe(name).exists)
         why << QStringLiteral("账户 %1 已经存在了").arg(name);
     if (!why.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("新建用户"), why.join(QStringLiteral("\n")));
+        refused(QStringLiteral("新建用户"), why);
         return;
     }
     const bool admin = m_newAdmin->isChecked();
-    const QString ask = QStringLiteral("在本机（%1）上创建本地账户「%2」%3。")
-        .arg(m_info.machine, name,
-             admin ? QStringLiteral("，并加入 Administrators 组（那是完整的管理员权限）")
-                   : QStringLiteral("（普通用户，不给管理员）"));
-    const QString lines = QStringLiteral(
-        "新用户第一次登录时 Windows 会给它建一个全新的 C:\\Users 目录。"
-        "密码设为永久有效，不会被到期策略拦住。"
-        "密码会临时写进一个脚本文件、跑完立刻删 —— 但那一瞬间它是在盘上的。"
-        "需要管理员授权（会弹 UAC）。确认创建吗？");
-    if (QMessageBox::question(this, QStringLiteral("新建用户"), ask + QStringLiteral("\n") + lines) != QMessageBox::Yes)
+    if (!armOrRun(m_create, QStringLiteral("确认创建"),
+                  QStringLiteral("第二下才会真建：在本机 %1 上建本地账户「%2」%3；"
+                                 "它第一次登录时 Windows 会给它建一个新的 C:\\Users 目录；"
+                                 "密码会临时写进一个脚本文件、跑完立刻删 —— 那一瞬间它是在盘上的。")
+                      .arg(m_info.machine, name,
+                           admin ? QStringLiteral("并加入 Administrators 组（那是完整的管理员权限）")
+                                 : QStringLiteral("（普通用户，不给管理员）"))))
         return;
     QString err;
     const bool ran = UserAccount::runElevatedScript(

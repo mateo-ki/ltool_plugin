@@ -1,6 +1,7 @@
 #include "OcrBundle.h"
 
 #include "Archives.h"
+#include "DevEnv.h"
 #include "Utils.h"
 
 #include <QCryptographicHash>
@@ -68,6 +69,8 @@ QString getOne(const QString& url, const QString& to, const Progress& progress, 
               QString* err)
 {
     QNetworkAccessManager nam;
+    DevEnv::applyProxy(&nam);   // 和产品里其他下载同一颗：留空 = 跟着系统代理走
+    const QString px = DevEnv::proxyUrl();
     QNetworkRequest req { QUrl(url) };
     req.setRawHeader("User-Agent", "ltool/0.4 ocr-bundle");
     QNetworkReply* reply = nam.get(req);
@@ -99,7 +102,13 @@ QString getOne(const QString& url, const QString& to, const Progress& progress, 
     reply->deleteLater();
     out.close();
     if (netErr != QNetworkReply::NoError) {
-        *err = QStringLiteral("下载失败：%1").arg(netText);
+        // 这句话要说清走的哪条路：境外源 + 本机有代理时，"下不动"多半不是源的问题，
+        // 是代理那一跳没通 —— 不点名的话就只能靠猜。
+        *err = QStringLiteral("下载失败：%1（%2）")
+                   .arg(netText,
+                        px.isEmpty()
+                            ? QStringLiteral("这台机器没检测到代理，这趟是直连")
+                            : QStringLiteral("这趟走的是本地代理 %1，想换一个就在配置页「下载代理」那格填新的地址").arg(px));
         QFile::remove(to);
         return {};
     }

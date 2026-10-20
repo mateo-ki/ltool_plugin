@@ -1,0 +1,13 @@
+{
+ "Id": "tasks",
+ "Name": "定时任务",
+ "Desc": "到点跑 c++/java/python/js/rust 脚本",
+ "Api": 4,
+ "Version": "1.0.1",
+ "Keywords": [
+  "定时",
+  "计划",
+  "cron"
+ ],
+ "Color": "214,128,15"
+}

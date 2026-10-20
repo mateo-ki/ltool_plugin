@@ -3,8 +3,10 @@
 #include <QWidget>
 
 class QLabel;
+class QListWidget;
 class QPushButton;
 class Recorder;
+class WindowPreview;
 
 // F2 录屏的界面那一层：
 //  WindowPicker = 列出"整个屏幕"+ 桌面上看得见的窗口，选一个要录的（不弹就不知道该录谁）
@@ -32,6 +34,10 @@ class WindowPicker : public QWidget {
 public:
     explicit WindowPicker(QWidget* parent = nullptr);
 
+    // 预览那一块（判据要读它拿没拿到帧、缩成了多大）；界面只管摆图和说一句实话
+    WindowPreview* preview() const { return m_pv; }
+    QPushButton* startButton() const { return m_rec; }
+
 signals:
     // monitor=true 时 target 是 HMONITOR（录整块屏幕），否则是 HWND（录那一个窗口）
     void picked(WId target, const QString& title, bool monitor);
@@ -42,10 +48,26 @@ protected:
     // 右上角另外有个「✕」，那是给人眼看的落点。
     void keyPressEvent(QKeyEvent* e) override;
     bool eventFilter(QObject* watched, QEvent* e) override;
+    // 没标题栏 = 没有地方能拖着它走。按住标题那一行（和四周空白）就能挪。
+    void mousePressEvent(QMouseEvent*) override;
+    void mouseMoveEvent(QMouseEvent*) override;
+    void mouseReleaseEvent(QMouseEvent*) override;
+    // 收起来就把取帧那一路放掉：压在别人窗口上面的实时抓取不能空转
+    void hideEvent(QHideEvent*) override;
+    void showEvent(QShowEvent*) override;
 
 private:
-    QWidget* m_list = nullptr;
+    void refreshPreview();            // 按当前选中那条 + 当前「画面」档重开预览
+    void chooseCurrent();             // 「开始录制」那颗、和回车，走的都是这一条
+
+    QListWidget* m_list = nullptr;
     QPushButton* m_close = nullptr;
+    QPushButton* m_rec = nullptr;
+    QLabel* m_shot = nullptr;         // 预览那张图
+    QLabel* m_cap = nullptr;          // 图下面那行字（多大 / 为什么没图）
+    WindowPreview* m_pv = nullptr;
+    QPoint m_press;
+    bool m_dragging = false;
 };
 
 class RecordBar : public QWidget {

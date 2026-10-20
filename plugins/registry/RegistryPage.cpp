@@ -1,4 +1,5 @@
 #include "RegistryPage.h"
+#include "platform/Launch.h"
 
 #include "InfoRow.h"
 #include "RegClean.h"
@@ -274,6 +275,6 @@ void RegistryPage::exportReport()
                        it.detail, RegClean::riskLabel(it));
     }
     f.close();
-    Utils::revealInExplorer(path);
+    Platform::reveal(path);
     m_status->setText(QString("报告已导出：%1").arg(path));
 }

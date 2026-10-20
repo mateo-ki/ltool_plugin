@@ -8,6 +8,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QCheckBox;
+class QTimer;
 class QFutureWatcherBase;
 
 // 账户那一层的读/写全在这个 namespace 里，页面只是壳。
@@ -60,6 +61,12 @@ private:
     void applyFullName();
     void applyAccountName();
     void createNewUser();
+    // 就地两段确认：第一下把同一颗按钮变成「确认…」并亮 6 秒，第二下才动手（返回 true）。
+    // 不再用模态框 —— 这页从启动器里叫出来，启动器一失焦就把自己藏起来，
+    // 挂在它里面的模态框看不见也答不了，实测三颗按钮按下后哪儿也没去。
+    bool armOrRun(QPushButton* btn, const QString& confirmText, const QString& risk);
+    void disarm();
+    void refused(const QString& action, const QStringList& why);
 
     QLabel* m_state = nullptr;
     QLabel* m_hint = nullptr;
@@ -74,4 +81,7 @@ private:
     QPushButton* m_create = nullptr;
     UserAccount::Info m_info;
     QFutureWatcherBase* m_watcher = nullptr;
+    QPushButton* m_armed = nullptr;      // 现在处于"等你第二下"的那颗（最多一颗）
+    QString m_armedText;                 // 它原来的文字，收回时换回去
+    QTimer* m_armTimer = nullptr;
 };
