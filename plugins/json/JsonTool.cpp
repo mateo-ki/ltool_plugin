@@ -126,11 +126,13 @@ JsonTool::JsonTool(QWidget* parent)
     mono.setPointSizeF(9.6);
     m_edit->setFont(mono);
     m_tree->setFont(mono);
-    split->addWidget(m_tree);
+    // 左边输入、右边看效果（他 2026-10-21 点名）。以前是反的：树在左、文本框在右，
+    // 于是要先把光标挪到右边才能粘 JSON，左边那块先被解析结果占住。
     split->addWidget(m_edit);
-    split->setStretchFactor(0, 2);
-    split->setStretchFactor(1, 3);
-    split->setSizes({480, 700});
+    split->addWidget(m_tree);
+    split->setStretchFactor(0, 1);
+    split->setStretchFactor(1, 1);
+    split->setSizes({640, 560});
     lay->addWidget(split, 1);
 
     m_status = new QLabel(this);

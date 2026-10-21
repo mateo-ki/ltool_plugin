@@ -13,7 +13,7 @@
 | 东西 | 是什么 |
 | --- | --- |
 | `plugins/<id>/` | 一个插件：页面/动作本体 + 一层 `LToolPlugin` 壳 + `plugin.json` + 自己的 `CMakeLists.txt`（**19 个**，从主仓库同步） |
-| `sdk/` | 主仓库 `tools/make_sdk.py` 生成的**快照**：core 公开的 25 个头 + `ltoolcore.lib`（导入库）+ `ltool-plugin.cmake` + `INFO.txt`。主仓库改了 core 的公开面就得重生成它（接口号那份由 `tools/core_abi_gate.py` 盯着） |
+| `sdk/` | 主仓库 `tools/make_sdk.py` 生成的**快照**：core 公开的那 **26 个头**（ltool 1.4.0 / API 4；比 1.3.3 那份多的那颗是 `Theme.h` —— 只有「剪贴板」这棵 include 它，那张自绘的卡片墙现在问 core 那张角色表要墨水）+ `ltoolcore.lib`（导入库）+ `ltool-plugin.cmake` + `INFO.txt`。头清单是 `plugins/` 里真实 include 求传递闭包得到的，不是手抄；主仓库改了 core 的公开面就得重生成它（接口号那份由 `tools/core_abi_gate.py` 盯着） |
 | `dist/` | 编好的 19 个 dll + `index.json`。**从 ltool 1.3.0 起，插件商店不再读这里** —— 商店读的是主仓库那次发版的资产（`releases/download/v<版本>/plugins-index.json`，dll 和 core 同一次构建）。这里留着 = 独立编出来的参照物 |
 | `tools/make_index.py` | 生成 `dist/index.json`（sha256/字节数从产物现算） |
 | `.github/workflows/build.yml` | CI：装依赖（vcpkg classic，只要 `qtbase`）→ 验 Qt 版本 → 验 SDK（**按 API 4 编，对不上就红**）→ 验 `dist/` 自洽 → 编 19 个 dll → 出 index.json → 存 artifact（**不自动发布**） |

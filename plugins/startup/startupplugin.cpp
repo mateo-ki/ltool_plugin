@@ -19,7 +19,7 @@ public:
     int apiVersion() const override { return LTOOL_PLUGIN_API_VERSION; }
     QString id() const override { return QStringLiteral("startup"); }
     QString name() const override { return QStringLiteral("开机启动分析"); }
-    QString desc() const override { return QStringLiteral("开机后都有什么自己起来 · 谁家的 · 哪些该管哪些不用管"); }
+    QString desc() const override { return QStringLiteral("开机后都有什么自己起来 · 谁家的 · 哪些该管 · 应用的能直接关"); }
     QStringList keywords() const override
     {
         return { QStringLiteral("启动"), QStringLiteral("开机"), QStringLiteral("自启"), QStringLiteral("startup"), QStringLiteral("autostart"), QStringLiteral("服务"), QStringLiteral("计划任务") };

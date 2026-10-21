@@ -1,6 +1,7 @@
 #include "ClipboardPage.h"
 
 #include "ClipboardStore.h"
+#include "Theme.h"
 #include "Utils.h"
 
 #include <QElapsedTimer>
@@ -45,6 +46,18 @@ QRect ClipboardPage::thumbRect(const QRect& card)
     return QRect(card.left() + kPad, card.top() + 27, card.width() - 2 * kPad, kThumbH);
 }
 
+ClipboardPage::CardInks ClipboardPage::cardInks(bool selected)
+{
+    CardInks k;
+    // 选中那颗：描边走主色、底是主色压 16%（40/255）—— 两个模式共用同一支主色，
+    // 因为 `accent` 本身就是"日间更深、夜间更亮"的一对值。
+    k.stroke = selected ? Theme::color("accent") : Theme::color("cardLine");
+    k.fill   = selected ? Theme::color("accent", 40) : Theme::color("card");
+    k.time   = Theme::color("muted");
+    k.body   = Theme::color("text");
+    return k;
+}
+
 QRect ClipboardPage::bodyRect(const QRect& card, bool hasImage)
 {
     const int top = hasImage ? 27 + kThumbH + kGap : 27;
@@ -54,9 +67,8 @@ QRect ClipboardPage::bodyRect(const QRect& card, bool hasImage)
 
 namespace {
 
-// 卡片本身怎么画。颜色抄的是这套深色里那几颗真值（ToolsPage 的卡片同一套写法：
-// 底 rgba(255,255,255,0.08)、描边 rgba(255,255,255,0.12)、选中 #3f6ae0），
-// 不在这儿发明第四种深色。
+// 卡片本身怎么画。四笔墨水全从 ClipboardPage::cardInks() 拿（那里只出 Theme 的角色），
+// 这一层一颗颜色都不写死 —— 原来这里抄了一份深色真值，配置页切到日间就变成"白纸上写白字"。
 class ClipCardDelegate : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
@@ -68,8 +80,9 @@ public:
         const QRect card = opt.rect.adjusted(1, 1, -1, -1);
         p->save();
         p->setRenderHint(QPainter::Antialiasing, true);
-        p->setPen(selected ? QColor(0x3f, 0x6a, 0xe0) : QColor(255, 255, 255, 31));
-        p->setBrush(selected ? QColor(63, 106, 224, 40) : QColor(255, 255, 255, 20));
+        const ClipboardPage::CardInks ink = ClipboardPage::cardInks(selected);
+        p->setPen(ink.stroke);
+        p->setBrush(ink.fill);
         p->drawRoundedRect(card, 6, 6);
 
         // 时间：一行小灰字，画不下的部分让给它（右边那半截留给"图片/文本"那个词）
@@ -81,7 +94,7 @@ public:
         QRect tr = ClipboardPage::timeRect(card);
         if (hasImage)
             tr.setWidth(tr.width() - 34);
-        p->setPen(QColor(0x8b, 0x93, 0xa7));
+        p->setPen(ink.time);
         QFont tf = p->font();
         tf.setPointSizeF(8.5);
         p->setFont(tf);
@@ -108,7 +121,7 @@ public:
         QFont bf = p->font();
         bf.setPointSizeF(9.5);
         p->setFont(bf);
-        p->setPen(QColor(0xe8, 0xeb, 0xf2));
+        p->setPen(ink.body);
         const QRect br = ClipboardPage::bodyRect(card, hasImage);
         p->drawText(br, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, body);
         p->restore();
@@ -233,16 +246,18 @@ ClipboardPage::ClipboardPage(QWidget* parent)
     m_list->installEventFilter(new DeleteKeyFilter(this, m_list));
     lay->addWidget(m_list, 1);
 
-    auto* hint = new QLabel(QStringLiteral("双击一张卡 = 放回剪贴板 · 选中按 Delete = 从记录里去掉那一条"), this);
+    auto* hint = new QLabel(QStringLiteral("点一张卡 = 放回剪贴板 · 选中按 Delete = 从记录里去掉那一条"), this);
     hint->setObjectName(QStringLiteral("clipHint"));
     hint->setWordWrap(true);
     lay->addWidget(hint);
 
     connect(m_filter, &QLineEdit::textChanged, this, [this] { buildRows(); });
 
-    // 双击 = 把那条放回剪贴板。走 core 那侧同一个 restore（搜索框那一节也是它），
-    // 这里不抄第二份"写剪贴板"的逻辑。
-    connect(m_list, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* row) {
+    // **点一下 = 把那条放回剪贴板**（他 2026-10-21 点名「点击剪贴板卡片就是复制」；以前要双击）。
+    // 走 core 那侧同一个 restore（搜索框那一节也是它），这里不抄第二份"写剪贴板"的逻辑。
+    // 双击不再单独接：第一下已经复制过了，再挂一条就是两条通道干同一件事
+    //（而且连点两下会写两次剪贴板、多两行日志）。
+    connect(m_list, &QListWidget::itemClicked, this, [this](QListWidgetItem* row) {
         if (!row)
             return;
         ClipboardStore::instance().restore(row->data(Qt::UserRole).toInt());
@@ -256,6 +271,15 @@ ClipboardPage::ClipboardPage(QWidget* parent)
     });
 
     refresh();
+}
+
+bool ClipboardPage::event(QEvent* e)
+{
+    // 自绘的东西不吃样式表，Theme::setMode() 广播下来的 ThemeChange 到这儿必须自己重画一次 ——
+    // 不然切了模式整墙卡片还是老颜色，而配置页那句"拨一下就当场生效"就成了假话。
+    if (e->type() == QEvent::ThemeChange && m_list)
+        m_list->viewport()->update();
+    return QWidget::event(e);
 }
 
 void ClipboardPage::showEvent(QShowEvent* e)

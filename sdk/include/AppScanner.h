@@ -19,7 +19,7 @@ namespace AppScanner {
 // 外加配置页「应用目录」里用户自己加的 exe/文件夹（见 apps/roots、apps/depth）
 QVector<AppEntry> scan();
 
-// 读写索引缓存 %APPDATA%/ltool/apps.json（JSON 数组，字段名与结构体同名）
+// 读写索引缓存 <数据目录>/apps.json（JSON 数组，字段名与结构体同名）
 QVector<AppEntry> loadIndex();
 void saveIndex(const QVector<AppEntry>& list);
 

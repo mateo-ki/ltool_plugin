@@ -10,8 +10,46 @@ inline constexpr const wchar_t kInstanceKey[] = L"ltool.instance";
 
 namespace Utils {
 
-// %APPDATA%/ltool 及其子目录
+// 数据目录：配置、日志、应用/文件索引、剪贴板历史与图、OCR 模型、图标缓存全在这儿。
+// **默认落在软件目录下 —— `<exe 目录>\data`，不往 C 盘的 %APPDATA% 堆**（他 2026-10-21 点名）。
+// 三档优先：`LTOOL_DATA_DIR` 环境变量（自测沙箱 / 便携模式）→ 软件目录（写得进去的话）
+// → `%APPDATA%\ltool`（装到只读位置的退路，会留一条日志）。
 QString dataDir();
+// 上面那三档的算法，抽成纯函数是为了判据能**不碰真文件系统**就问它（三个输入都给死）。
+QString resolveDataDir(const QString& appDir, const QString& envOverride, const QString& appData,
+                       bool appDirWritable);
+// 一次性搬家：老 `%APPDATA%\ltool` 还在、新目录是空的 → 逐个复制并按 sha256 对过。
+// **旧目录原样留着不删**（那是真实数据，删错了没法复），返回搬了几个文件。
+int migrateLegacyDataDir(QString* note);
+// 搬家前先给"程序自己写的默认值"让路：目标目录里那份**内容逐字节等于内置默认**的文件先删掉，
+// 好让老目录里那份真数据进来（其余同名文件照旧不覆盖）。
+// 为什么单独抽出来：2026-10-21 真丢过一次 —— deliver 的 `installed` 那一栏会先拿装好的 exe 跑
+// `--plugintest`，那一趟在还没搬的数据目录里写下了默认 `webs.json`（2 条），于是"已有同名不覆盖"
+// 把你那份 24 条网站关键字挡在老目录里，界面上就只剩默认那 2 条。
+int clearStockDefaultsForMigration(const QString& dir);
+// 搬家整条链"两个目录都给死"的那一版：查标记 → 默认表让路 → 逐文件按 sha256 复制 → 落标记，
+// 全在这一颗里；`migrateLegacyDataDir` 只负责算出这两个目录再交给它（`LTOOL_DATA_DIR` 设着时根本不叫它）。
+// 为什么要单独有一版：判据得能拿两个临时目录跑**这条真链**，而不是只量其中一颗 helper ——
+// 上面那次事故的形状恰恰是"helper 都在、也测绿了，只是搬家那一步漏了调用它"。
+int migrateBetween(const QString& legacy, const QString& now, QString* note);
+// 「这个数据目录还没接住你的真数据」：老目录还在、而新目录里既没有搬过的标记也没有 config.ini
+//（和搬家那三条守卫同一套判断，同一个来源）。设着 `LTOOL_DATA_DIR` 时永远返回 false ——
+// 沙箱/便携模式那个目录就是它自己的，往里写默认值是对的。
+// 为什么要有这颗：**任何**往还没搬的目录里写"程序自带的默认表"的路径，都会让
+// 搬家那条"同名不覆盖"把真数据挡下来（2026-10-21 那次事故的一般形状，不止 webs.json 一处）。
+bool legacyMigrationPending();
+// 上面那颗拆开问的那一版：两个目录给死，判据不碰真文件系统就能问（同 `resolveDataDir` 的规矩）。
+bool migrationPendingFor(const QString& legacy, const QString& now);
+// 已经"搬过"的那些安装里补一次（一次性脚本 `build/verify/migrate_ltool_data.ps1` 的程序版）：
+// 只按两条明确的规矩，其余一概不动 ——
+//   ① 目标里那份**内容逐字节等于内置默认**的表，而老目录里有一份不同的（= 用户的真那份）→ 用老的；
+//   ② 目标里 `clipboard.json` 现在**正引用着**、而本地缺失的图片 → 从老目录补进来。
+// 不做"整棵树补缺"：那样会把用户后来自己删掉的东西（往期截图、清理过的剪贴板图）每次启动都复活。
+// 返回补了几个文件，`actions` 里逐条写清补了什么（进日志）。
+int backfillFromLegacy(const QString& legacy, const QString& now, QStringList* actions);
+// 搬家那一段真正干活的部分：整棵树复制过去，**每个文件都按 sha256 对过**才算搬成，
+// 对不上的删掉半成品并记进 problems。源目录一个字都不动。抽出来是为了判据能拿两个临时目录真跑一遍。
+int copyVerifiedTree(const QString& from, const QString& to, QStringList* problems, int* skipped = nullptr);
 QString iconsDir();
 QString pluginsDir();
 QString backupsDir();

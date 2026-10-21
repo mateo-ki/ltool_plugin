@@ -1,5 +1,5 @@
 // 剪贴板插件自带的判据：过滤那条纯函数、页面"行号 ↔ 存储下标"的映射、状态行说实话、
-// 双击复用 / Delete 删这条 / 清空 三条动作真的落到数据上。
+// **点一张卡就复制**（真鼠标事件打在卡片矩形上，不是自己调 restore）/ Delete 删这条 / 清空 三条动作真的落到数据上。
 //
 // 全在离屏跑，数据用沙箱 APPDATA 里自造的 clipboard.json（main.cpp 那串白名单会把
 // --cliptest 的数据目录挪到临时目录），一条都不碰他真实的剪贴板历史。
@@ -9,6 +9,7 @@
 // load() 当场裁掉，「过滤 / 行号」那 36 条就全踩在一份被动过的数据上。
 #include "ClipboardPage.h"
 #include "ClipboardStore.h"
+#include "Theme.h"
 #include "Utils.h"
 
 #include <QApplication>
@@ -25,6 +26,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLayout>
+#include <QMouseEvent>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
@@ -206,6 +208,12 @@ extern "C" Q_DECL_EXPORT int ltoolPluginSelftest()
     check("列表摆在布局里", reachedFrom(&page, listw) ? "yes" : "no", "yes");
     check("清空那颗摆在布局里", reachedFrom(&page, clearBtn) ? "yes" : "no", "yes");
     check("说明那行摆在布局里", reachedFrom(&page, hint) ? "yes" : "no", "yes");
+    // 界面要说清"怎么用"：手势改了，那行字也得跟着改（写着"双击"而按一下就成了，
+    // 是让用户去双击 —— 而双击的第一下已经复制过了，等于骗人多按一下）。
+    check("说明那行写的是「点一张卡」，不再是「双击」",
+          hint && hint->text().contains(QStringLiteral("点一张卡"))
+              && !hint->text().contains(QStringLiteral("双击")) ? QStringLiteral("yes") : QStringLiteral("no"),
+          "yes");
 
     check("没过滤时列表四行", QString::number(page.rowCount()), "4");
     check("每一行都对得上自己的下标", rowsAgreeWithTheirIndexes(cs.items(), page), "ok");
@@ -215,10 +223,44 @@ extern "C" Q_DECL_EXPORT int ltoolPluginSelftest()
     check("这张页现在是卡片墙（IconMode + 自绘 delegate 都在）", page.viewKind(), "卡片墙");
     {   // 版面自己渲一张出来复核（离屏没有中文字形，字会是豆腐块 —— 那就核色块、格子和压字）
         page.resize(700, 460);
-        page.grab().save(QDir::tempPath() + "/ltool-clip-cards.png");
+        page.grab().save(QDir::tempPath() + "/ltool-clip-cards-night.png");
         std::printf("INFO 卡片版面渲了一张（肉眼复核用）：%s · %dx%d\n",
-                    (QDir::tempPath() + "/ltool-clip-cards.png").toUtf8().constData(),
+                    (QDir::tempPath() + "/ltool-clip-cards-night.png").toUtf8().constData(),
                     page.width(), page.height());
+    }
+    // ---- 两个模式的墨水对比度 ----
+    // 2026-10-20 他报"日间模式剪贴板每个卡片很难看，那个背景完全看不清"：这张页原来是自绘 +
+    // 自己抄了一份深色真值，白天就是"白卡片上写白字"。量的是 `cardInks()` 那颗决策的输入
+    // （delegate 用的就是它），不量截图；截图两个模式各渲一张供肉眼复核。
+    // 半透明的卡片底必须先合成到列表底上再比 —— 拿 rgba 的原始 rgb 直接比会算出假的高对比。
+    {
+        const auto inksIn = [](Theme::Mode m, double* bodyC, double* timeC, double* edgeC) {
+            Theme::setMode(m);
+            const ClipboardPage::CardInks ink = ClipboardPage::cardInks(false);
+            const QColor paper = Theme::over(ink.fill, Theme::color("base"));
+            *bodyC = Theme::contrast(ink.body.rgb(), paper.rgba());
+            *timeC = Theme::contrast(ink.time.rgb(), paper.rgba());
+            *edgeC = Theme::contrast(Theme::over(ink.stroke, paper).rgba(), paper.rgba());
+        };
+        double nb = 0, nt = 0, ne = 0, db = 0, dt = 0, de = 0;
+        inksIn(Theme::Mode::Dark, &nb, &nt, &ne);
+        inksIn(Theme::Mode::Light, &db, &dt, &de);
+        page.grab().save(QDir::tempPath() + "/ltool-clip-cards-day.png");
+        inksIn(Theme::Mode::Dark, &nb, &nt, &ne);   // 切回夜间再渲一张夜里的
+        std::printf("INFO 卡片对比度（正文/小字/描边）：夜间 %.2f/%.2f/%.2f · 日间 %.2f/%.2f/%.2f\n",
+                    nb, nt, ne, db, dt, de);
+        // 正文按 WCAG AA 要 ≥4.5:1（这次的红就是这个数不达标）；夜里那份正文本来就是亮的，
+        // 一起钉住"改颜色不许把老模式弄坏"。
+        check("日间：卡片正文压卡片底 ≥4.5:1（他这次报的就是这个数）",
+              db >= 4.5 ? "yes" : "no", "yes");
+        check("夜间：卡片正文压卡片底也 ≥4.5:1（改颜色不许把老模式弄坏）",
+              nb >= 4.5 ? "yes" : "no", "yes");
+        // 描边是非文本（WCAG 1.4.11 ≥3:1）—— 日间那张卡靠的就是"白卡 + 一道线"，
+        // 线一糊一整墙就糊成一片白（他这次说的"背景完全看不清"有这一半：旧值 #d1d1d6 只有 1.52:1）。
+        check("日间：卡片描边压卡片底 ≥3:1（非文本那条）", de >= 3.0 ? "yes" : "no", "yes");
+        // 夜间那条一直是"12% 白"压在近黑上（1.47:1），他这次没说夜里 —— 所以只钉"别比现在更糊"，
+        // 和启动器那圈描边一条规矩（拿 3:1 去动他用了很久的默认外观是另一件事，得他点头）。
+        check("夜间：卡片描边不许比现在这份更糊（≥1.4:1）", ne >= 1.4 ? "yes" : "no", "yes");
     }
     check("第一张卡占的格子和 cardSize() 是同一个数（不是每行自己算的）",
           QStringLiteral("%1x%2").arg(page.cardSizeAt(0).width()).arg(page.cardSizeAt(0).height())
@@ -270,11 +312,46 @@ extern "C" Q_DECL_EXPORT int ltoolPluginSelftest()
     check("越界问下标老实给 -1（不崩）",
           QStringLiteral("%1,%2").arg(page.storeIndexAt(-1)).arg(page.storeIndexAt(999)), "-1,-1");
 
-    // 复用走的是这一行自己的下标：过滤状态下复用第 0 行，进剪贴板的必须是那条文本
-    cs.restore(page.storeIndexAt(0));
+    // 点一张卡 = 复制（他 2026-10-21 点名「点击剪贴板卡片就是复制」，以前要双击）。
+    // 这里**不许自己调 restore**：那量的就只是 core 那颗函数，页面把信号接回双击也照样绿。
+    // 送一对真鼠标按下 + 抬起到列表的 viewport 上，命中第 0 行那块矩形 —— 走的才是它那根 itemClicked。
+    // 先把剪贴板清成一个别的值：不清的话，上一段某条判据留下的同一个字符串会让这条白绿。
+    const auto clickRow = [](QListWidget* l, int row) {
+        QWidget* vp = l->viewport();
+        const QRect r = l->visualItemRect(l->item(row));
+        if (!r.isValid() || r.isEmpty())
+            return false;
+        const QPoint p = r.center();
+        const QPoint g = vp->mapToGlobal(p);
+        QMouseEvent pr(QEvent::MouseButtonPress, p, g, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent rl(QEvent::MouseButtonRelease, p, g, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(vp, &pr);
+        QApplication::sendEvent(vp, &rl);
+        return true;
+    };
+    QApplication::clipboard()->setText(QStringLiteral("ZZZclip 复制前的占位"));
+    const bool rectOk = clickRow(listw, 0);
     QApplication::processEvents();
-    check("复用过滤后的那一行，进剪贴板的是它本身而不是 items[0]",
+    check("那条单击判据量的到东西（第 0 行那块卡片矩形非空 —— 空的话下面那条就是白绿）",
+          rectOk ? "yes" : "no", "yes");
+    check("单击一张卡就把它放回剪贴板（过滤状态下点的还是它自己那条）",
           QApplication::clipboard()->text(), QStringLiteral("ZZZclip 甲 alpha"));
+    // 连点两张不同的卡 = 后点那张进剪贴板；这条盯"点击不是一次性的"（第一下之后整墙会重建，
+    // 重建之后信号接不回来，第二张就永远复制不了）。挑的是第 3 行那条**文本**卡
+    //（第 0 行是图卡，走 setImage，比不了 text()）。
+    filter->setText(QString());
+    check("清掉过滤回到四张卡", QString::number(page.rowCount()), "4");
+    const bool rectOk2 = clickRow(listw, 3);
+    QApplication::processEvents();
+    check("重建之后点第二张卡照样复制（第 3 行那条：普通一条 ZZZ）",
+          rectOk2 && QApplication::clipboard()->text() == QStringLiteral("普通一条 ZZZ")
+              ? QStringLiteral("yes") : QStringLiteral("got=") + QApplication::clipboard()->text(),
+          "yes");
+    // 上面那段为了点第二张卡临时把过滤清了一次，这里立刻按原样设回去 ——
+    // 下面那条 Delete 钉的是"过滤状态下删掉选中的那一条"，夹具得还是只剩 1 行才量得准。
+    filter->setText(QStringLiteral("alpha"));
+    check("设回过滤之后又只剩一张卡（上面那次清过滤没把夹具搅乱）",
+          QString::number(page.rowCount()), "1");
 
     // Delete：选中第 0 行（过滤状态下的那条 = items[1]），送一个真按键事件给列表。
     // **必须在下面那段 setEnabled(true) 之前** —— 一打开收集，capture() 就会把剪贴板里
@@ -346,6 +423,35 @@ extern "C" Q_DECL_EXPORT int ltoolPluginSelftest()
     check("两个不同的文件不许被归一成同一个（那等于永不删）",
           ClipboardStore::keepKey(QStringLiteral("C:/a/b/x.png"))
               == ClipboardStore::keepKey(QStringLiteral("C:/a/b/y.png")) ? "yes" : "no", "no");
+    // ---- 搬家前那种绝对路径写法（2026-10-21 他那份真数据的第二半）----
+    // clipboard.json 里存的是**绝对路径**：数据目录从 %APPDATA% 搬进软件目录之后，
+    // 老条目记的还是老位置。他照着搬家那句说明"确认没问题之后自己删旧目录"的第二天，
+    // load() 那句"图不在了就不留空条目"就会把这几十条连条目一起丢掉。
+    const QString movedAway = data + "/clipimg_before_the_move/selftest.png";
+    {
+        QImage twin(64, 40, QImage::Format_RGB32);
+        twin.fill(QColor(10, 200, 30));
+        QDir().mkpath(QFileInfo(movedAway).absolutePath());
+        twin.save(movedAway, "PNG");      // 老位置那份"还在"也要改道：下次 save 就把路径带回新目录
+    }
+    check("两边都有同名那张 → 认现在这个 clipimg（老串就此被带回新位置，孤儿清理不再盯着副本）",
+          ClipboardStore::resolveImagePath(movedAway), data + "/clipimg/selftest.png");
+    check("认回来的那个文件真能打开（不是拼出来一条看着像的路径）",
+          QFileInfo::exists(ClipboardStore::resolveImagePath(movedAway)) ? QStringLiteral("yes")
+                                                                        : QStringLiteral("no"),
+          QStringLiteral("yes"));
+    const QString oldStillLive = data + "/other_place/live.png";
+    {
+        QImage one(8, 8, QImage::Format_RGB32);
+        one.fill(QColor(0, 0, 255));
+        QDir().mkpath(QFileInfo(oldStillLive).absolutePath());
+        one.save(oldStillLive, "PNG");
+    }
+    check("新目录里没有同名、老路径还打得开 → 一个字都不改（搬家之后那几张不能被改道成不存在的文件）",
+          ClipboardStore::resolveImagePath(oldStillLive), oldStillLive);
+    const QString nowhere = data + "/clipimg_before_the_move/nobody_sees_this.png";
+    check("哪儿都没有就老实原样返回（不许凭空造一条看着像的路径）",
+          ClipboardStore::resolveImagePath(nowhere), nowhere);
     const QString strayPath = QDir::toNativeSeparators(data + "/clipimg/stray.png");
     {
         QImage s(8, 8, QImage::Format_RGB32);
@@ -527,6 +633,36 @@ extern "C" Q_DECL_EXPORT int ltoolPluginSelftest()
         }
         cs.setEnabled(false);
         QApplication::clipboard()->setText(clipBackup);   // 这条路上动过真剪贴板，尽量原样还回去
+    }
+
+    // ---- 整条**读入**那条路（上面三条量的是 helper，漏掉调用处它们照样绿）----
+    // 把夹具改写成"搬家前那个目录里的绝对路径"，图本身留在新 clipimg 里不动，再让 store 真读一遍。
+    {
+        const QString keepName = QStringLiteral("selftest.png");
+        QImage img(64, 40, QImage::Format_RGB32);
+        img.fill(QColor(10, 200, 30));
+        img.save(data + "/clipimg/" + keepName, "PNG");
+        QJsonObject o;
+        o.insert("when", freshStamp);
+        o.insert("hash", QStringLiteral("hMoved"));
+        o.insert("image", true);
+        o.insert("path", data + "/clipimg_before_the_move/" + keepName);
+        o.insert("w", 64);
+        o.insert("h", 40);
+        o.insert("bytes", 1024.0);
+        QJsonArray arr;
+        arr.append(o);
+        QFile f(data + "/clipboard.json");
+        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            f.write(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+            f.close();
+        }
+        cs.load();
+        check("真读一遍：记着搬家前那串路径的图条目没被连条目一起丢掉",
+              QString::number(cs.items().size()), "1");
+        check("真读一遍：load() 里那一格指的是现在这个 clipimg（不是原样抄那串老路径）",
+              cs.items().isEmpty() ? QStringLiteral("(历史是空的)") : cs.items().at(0).imagePath,
+              data + "/clipimg/" + keepName);
     }
 
     std::printf("clipboard: 失败 %d 项\n", bad);

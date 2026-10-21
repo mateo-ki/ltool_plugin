@@ -4,6 +4,7 @@
 
 #include <QRect>
 #include <QVector>
+#include <QColor>
 #include <QWidget>
 
 class QLabel;
@@ -29,7 +30,7 @@ public:
     explicit ClipboardPage(QWidget* parent = nullptr);
 
     // 卡片上那三样的数据来源（除 UserRole 以外都是这页自己加的， UserRole 一直是
-    // "存储下标"，判据和双击/删除都读它，不能挪）
+    // "存储下标"，判据和点击复制/删除都读它，不能挪）
     static constexpr int TimeRole = Qt::UserRole + 1;    // 复制时间，已经格式化好的
     static constexpr int BodyRole = Qt::UserRole + 2;    // 文案（图片那条就是它的摘要）
     static constexpr int ImageRole = Qt::UserRole + 3;   // 这张卡有没有图（bool）
@@ -40,6 +41,18 @@ public:
     static QRect thumbRect(const QRect& card);
     static QRect timeRect(const QRect& card);
     static QRect bodyRect(const QRect& card, bool hasImage);
+
+    // 卡片上四笔墨水的来处 —— 全从 Theme 那张角色表取，**这里一颗颜色都不写死**。
+    // 原来这份在 dll 里各抄了一份深色真值（底 rgba(255,255,255,.08) / 描边 .12 / 正文 #e8ebf2），
+    // 于是配置页切到日间就是"白纸上写白字"（他 2026-10-20 报的那句"背景完全看不清"）。
+    // 抽成静态函数是为了判据能两个模式各问一遍，而不是只能看截图。
+    struct CardInks {
+        QColor fill;      // 卡片底
+        QColor stroke;    // 卡片描边
+        QColor time;      // 上面那行小字 + 「图」那个字
+        QColor body;      // 正文
+    };
+    static CardInks cardInks(bool selected);
 
     // 过滤：把 items 过一遍，返回的是**每条在 ClipboardStore 里的下标**，不是行号。
     // 抽成静态纯函数就为了这一件事能离线钉住 —— "把行号当用下标"是这一页最容易错的格子：
@@ -67,6 +80,8 @@ protected:
     // 每次这一页被看见都重摆一次 —— 剪贴板是别人随时在写的，"打开就看到最新的"比
     // 挂一个每秒轮询的定时器诚实，也省掉跨 dll 连 core 里那个 QObject 的信号。
     void showEvent(QShowEvent* e) override;
+    // 接 ThemeChange 重画那面卡片墙（自绘不吃样式表，光靠调色板换不成）
+    bool event(QEvent* e) override;
 
 
 private:

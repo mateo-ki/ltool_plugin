@@ -1,8 +1,8 @@
 ltool 插件 SDK —— 独立编一个 ltool-<id>.dll 要的那一份
 
-来自 ltool 1.3.3（插件接口 API 4）
-ltoolcore.lib 的 SHA256：f6f42d3ac7309cf82f53fe0f1bf8fb5eb0a9c93b436e7d78c3e3dc02d8c92c23
-头文件清单是 plugins/ 里真实 include 的那些求出来的传递闭包（25 个）：
+来自 ltool 1.4.0（插件接口 API 4）
+ltoolcore.lib 的 SHA256：f742322674879fd409a59414120760161d8acf0f0def5d37441086342c49bcac
+头文件清单是 plugins/ 里真实 include 的那些求出来的传递闭包（26 个）：
   AdBlocker.h
   AppScanner.h
   Archives.h
@@ -21,6 +21,7 @@ ltoolcore.lib 的 SHA256：f6f42d3ac7309cf82f53fe0f1bf8fb5eb0a9c93b436e7d78c3e3d
   SilentInstallLog.h
   StartupAudit.h
   TaskScheduler.h
+  Theme.h
   Utils.h
   core-api.h
   ltool-plugin.h

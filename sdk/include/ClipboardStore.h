@@ -51,6 +51,15 @@ public:
     // 原图被撤了小的也当孤儿扫走 —— 不另开目录，免得"孤儿怎么撤"要写第二遍。
     static QString thumbPath(const QString& imagePath);
 
+    // json 里记的是**绝对路径**（1.4.0 把数据目录搬进软件目录之前，它一直在 `%APPDATA%\ltool`）。
+    // 那串路径指的是老位置，而搬家那句说明让你"确认新位置没问题之后自己删旧目录"——
+    // 旧目录一删，load() 里"图不在了就不留空条目"那句会把这几十条**连条目一起**抹掉
+    // （随后一次 save 就把它们永久写出 json 之外）。所以每一格先按文件名在**现在这个**
+    // clipimg 里认一次（那颗文件名就是图内容的 sha1，同名即同内容），认得到就用它 ——
+    // 下一次 save 顺手把路径带回新目录，孤儿图清理也不会再把老位置那份的副本当没用的删掉。
+    // 认不到才原样返回：搬家之后新那几张本来就直接写在新的，老串要是还在就照旧能用。
+    static QString resolveImagePath(const QString& recorded);
+
     // 孤儿图清理的那道闸门和路径归一化：都暴露出来是为了能被判据直接问（批量删文件
     // 这件事一旦写歪就是丢历史，不该只有跑起来才发现）。
     static bool sweepAllowed(int itemCount);
@@ -63,9 +72,13 @@ public:
     QIcon iconFor(const Item& it) const;
     static QString summary(const Item& it);         // 列表里那一行显示什么
 
+    // 从 clipboard.json 重读一遍。放在 public 的理由和上面那几颗纯函数一样：
+    // 这次丢数据丢在**读**那一步（一串搬家前的绝对路径），而它只在 start() 里跑一次，
+    // 判据不公开它就量不到。（页面本来也不该自己 new 一份历史。）
+    void load();
+
 private:
     explicit ClipboardStore(QObject* parent = nullptr) : QObject(parent) {}
-    void load();
     void save() const;
     void capture();
     void prune();

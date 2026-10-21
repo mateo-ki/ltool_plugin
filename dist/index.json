@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "core": "来自 ltool 1.3.3（插件接口 API 4）",
+ "core": "来自 ltool 1.4.0（插件接口 API 4）",
  "plugins": [
   {
    "id": "ads",
@@ -19,7 +19,7 @@
    "color": "136,87,229",
    "file": "ltool-ads.dll",
    "bytes": 95232,
-   "sha256": "c598e0111c3799c8ddc0760de444bcc0f8953de561b2b45c88cdeba13c22e9a2",
+   "sha256": "7f37deb1069a5e9f2a899ece5ea15144d90a215db1b20cc0ebc5d41ac3667028",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-ads.dll"
   },
   {
@@ -38,7 +38,7 @@
    "color": "190,130,60",
    "file": "ltool-base64.dll",
    "bytes": 69632,
-   "sha256": "09888d7dd02e507e4d1f3f5dd6f5ee23eca6aebc32550dc9ba2ffbc42980be31",
+   "sha256": "c8bb6883baf355211ac320c51bf78a799bd01d1e45452e9d8d75093bbc948ef0",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-base64.dll"
   },
   {
@@ -63,7 +63,7 @@
    "color": "52,152,219",
    "file": "ltool-capture.dll",
    "bytes": 370176,
-   "sha256": "2dc19dfb0cf5b7c6b7769837c388d984c9000caaef9359531171507a42cadb34",
+   "sha256": "6f44cf3c6cab501f26a9fbffc2bac9d171c31436307bb4922fa21e5eba9c9f89",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-capture.dll"
   },
   {
@@ -78,11 +78,11 @@
     "clipboard"
    ],
    "actions": [],
-   "version": "1.1.1",
+   "version": "1.1.3",
    "color": "40,120,160",
    "file": "ltool-clipboard.dll",
-   "bytes": 125952,
-   "sha256": "67befedbc4497ab813aa2fa625cc375c184be1f2e87cea826200bb8874543363",
+   "bytes": 138240,
+   "sha256": "8701164d2b5058b020a49c531367e8c908ced74a8b7a4b045a94153b5d618f78",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-clipboard.dll"
   },
   {
@@ -103,7 +103,7 @@
    "color": "87,160,40",
    "file": "ltool-disk.dll",
    "bytes": 183808,
-   "sha256": "f4c9d89f0770def850774fb32e63341eb6a6eb4319efa8dc2c199942fd19d0b2",
+   "sha256": "ee86f5abf69258afe5578c1f9f133de31af24ec90d5f45bda28ab11c66b53142",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-disk.dll"
   },
   {
@@ -121,7 +121,7 @@
    "color": "13,165,170",
    "file": "ltool-downloads.dll",
    "bytes": 68096,
-   "sha256": "efc1a54227ed8a33be621525876b14ae5e9a3c9ebcd7e3c961ed6cc3e9d4bbdb",
+   "sha256": "12a9a2a98584a040335ce7be053b1946ec550ee961e4f227e75b45ef538bbdb0",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-downloads.dll"
   },
   {
@@ -143,7 +143,7 @@
    "color": "87,160,40",
    "file": "ltool-grid.dll",
    "bytes": 157696,
-   "sha256": "07c9530a28c8d2b5b5da12e2df9618cd2efd444309ad1f45978f20e53fdc9ece",
+   "sha256": "9dc62f943e5cff81ce1667a10c8277f058291bfde1d70f07c0ba298d91ed31f8",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-grid.dll"
   },
   {
@@ -157,11 +157,11 @@
     "json格式化"
    ],
    "actions": [],
-   "version": "1.0.1",
+   "version": "1.0.2",
    "color": "90,140,220",
    "file": "ltool-json.dll",
    "bytes": 80896,
-   "sha256": "0b4703a272978b098ed7099516e8943da3cba9093ed85a96332f8206368ec82c",
+   "sha256": "37607effdf403628fc7e0e886e10e1894c689000809bc8f47bdbb77ab80e4f06",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-json.dll"
   },
   {
@@ -188,7 +188,7 @@
    "color": "40,150,220",
    "file": "ltool-language.dll",
    "bytes": 178176,
-   "sha256": "7419dc6e29439f0ae8ade96e0d083a469e4b5a4735c2feb0e7cbd0ac5ecdb78b",
+   "sha256": "2049af58ac6e914305b7b9622b7461698f8677f52a378a239a084ce2b1810565",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-language.dll"
   },
   {
@@ -209,7 +209,7 @@
    "color": "226,120,60",
    "file": "ltool-linuxdo.dll",
    "bytes": 182784,
-   "sha256": "32e3c2fb61ff63e31174b3110fa88206c9635258314a335d194ffd1f8ce8fa32",
+   "sha256": "c362bd0c3c50146c25aaaae82ccc824e9ff0b58efca2b2f5215435f164e81dd1",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-linuxdo.dll"
   },
   {
@@ -227,7 +227,7 @@
    "color": "0,150,199",
    "file": "ltool-network.dll",
    "bytes": 102912,
-   "sha256": "53baea38a9fcaccb500897d2b191f799db862dd1850088c330920c8b40f6d119",
+   "sha256": "c29e2c1f843168a0156cbb8ac443c1ef8b0807d842f4b100cf3509a51cc4a67c",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-network.dll"
   },
   {
@@ -249,7 +249,7 @@
    "color": "219,72,160",
    "file": "ltool-record.dll",
    "bytes": 283136,
-   "sha256": "9dfeaf254f7006ca6480126bf4d6a8ce2844b0706478aa53749ad4999db990bb",
+   "sha256": "692330e049659848e20eebea096c95b04735dc4964233169fc3039f293313c18",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-record.dll"
   },
   {
@@ -270,7 +270,7 @@
    "color": "150,100,60",
    "file": "ltool-registry.dll",
    "bytes": 96768,
-   "sha256": "3b86be7943ff711790d2bd8414a45ad21696eadf95f516ff525d233b7847968a",
+   "sha256": "703f192b1f87e65f2467176ae87d52fcd72d494a68aa2070dca60923f77425af",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-registry.dll"
   },
   {
@@ -293,7 +293,7 @@
    "color": "214,69,69",
    "file": "ltool-repair.dll",
    "bytes": 90112,
-   "sha256": "f3841c6675ec4cc3376ccef5ec33dcabc19baa0cfceabab2e6dfc436fbfcdf4d",
+   "sha256": "38b0f8489d634d1ca5120596b4e919b228eb18176f2f80ee9d11574fbd883e1f",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-repair.dll"
   },
   {
@@ -322,7 +322,7 @@
    "color": "203,110,52",
    "file": "ltool-shell.dll",
    "bytes": 138240,
-   "sha256": "bdf04d45e1e9a00968f7e3d24ce9037f72022689457e5be7cf0ed9752514480e",
+   "sha256": "2a64faa938b425cf4c37e3a2b89d373ebfd850182561b8e2d5214dec9aa008e2",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-shell.dll"
   },
   {
@@ -340,13 +340,13 @@
    "color": "46,160,88",
    "file": "ltool-software.dll",
    "bytes": 242176,
-   "sha256": "45c9d6932288fdae98b8a1b32fa4ef462a84f15fe2df30f6ee53941ebe54cdb1",
+   "sha256": "84323f6b13fbcf42119e77e6d01f4f1fa4abd1486f1a09726278d606c197a5af",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-software.dll"
   },
   {
    "id": "startup",
    "name": "开机启动分析",
-   "desc": "开机后都有什么自己起来 · 谁家的 · 哪些该管哪些不用管",
+   "desc": "开机后都有什么自己起来 · 谁家的 · 哪些该管 · 应用的能直接关",
    "api": 4,
    "keywords": [
     "启动",
@@ -358,11 +358,11 @@
     "计划任务"
    ],
    "actions": [],
-   "version": "1.0.2",
+   "version": "1.1.0",
    "color": "60,140,120",
    "file": "ltool-startup.dll",
-   "bytes": 99840,
-   "sha256": "7aebaecb77732d55a2d9a990897dfdf9e243151f92103856419e86c4f1027f9d",
+   "bytes": 153600,
+   "sha256": "745d6a20ec37ace41700edce95b93131d9a829babaddefd41da4a6ca240b928b",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-startup.dll"
   },
   {
@@ -380,7 +380,7 @@
    "color": "214,128,15",
    "file": "ltool-tasks.dll",
    "bytes": 98304,
-   "sha256": "0264db80cf525a61b88e849ae06703cb5cc081d3a36d13454d4f45b81eae2318",
+   "sha256": "1496f6bbaa7986b14c8ef64f5dd22f23f143005664e6b2a702dab50c7350f553",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-tasks.dll"
   },
   {
@@ -402,7 +402,7 @@
    "color": "120,90,200",
    "file": "ltool-user.dll",
    "bytes": 142848,
-   "sha256": "118e0e78e1c29eaa12a22b0ceb663138c2f2e03c8d0e437121d757f6db8a0a7e",
+   "sha256": "ce2cf6149280df053ba9ef49d47cc6832949e16353498dd5b71fe549c76b7b26",
    "url": "https://raw.githubusercontent.com/mateo-ki/ltool_plugin/main/dist/ltool-user.dll"
   }
  ]

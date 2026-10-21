@@ -19,7 +19,7 @@ struct DevItem {
     QString version;
 };
 
-// 一个开发环境插件（对应 %APPDATA%/ltool/plugins/<id>.json，用户可自定义）
+// 一个开发环境插件（对应 <数据目录>/plugins/<id>.json，用户可自定义）
 struct DevPlugin {
     QString id;    // java / c++ / node / python / rust / 自定义
     QString name;  // 显示名称
