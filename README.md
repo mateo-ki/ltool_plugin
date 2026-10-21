@@ -28,7 +28,7 @@ cmake -B build -G "Visual Studio 17 2022" -A x64 \
 # 或者 Qt 在别处（官方包/自己编的）
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=<Qt6 6.10.2 所在>
 
-cmake --build build --config Release            # 全部 12 个
+cmake --build build --config Release            # 全部插件 dll（颗数按 plugins/*/ 现枚举）
 cmake --build build --config Release --target ltool-json   # 只编一个
 ```
 

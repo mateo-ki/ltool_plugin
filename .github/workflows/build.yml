@@ -206,7 +206,7 @@ jobs:
 
       # ---------------- 插件编译与打包 ----------------
       # 生成器钉 Visual Studio 17 2022 多配置
-      - name: 配置并编出 12 个 dll
+      - name: 配置并编出全部插件 dll（颗数按 plugins/*/ 现枚举，不写死数字）
         shell: bash
         env:
           VCPKG_ROOT: ${{ env.PLUGINS_VCPKG }}
