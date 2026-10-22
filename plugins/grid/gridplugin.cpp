@@ -31,12 +31,10 @@ public:
     }
     QWidget* createPage(QWidget* parent) override
     {
-        auto* p = new GridPage(parent);
-        m_page = p;
-        return p;
+        // 原来这里存了一份 m_page，**存进去之后再没人读过**：
+        // 一张随时可能被宿主删掉的页，留个裸指针在那儿只会让人以为它有用（还会诱出 use-after-free）。
+        return new GridPage(parent);
     }
-
-    GridPage* m_page = nullptr;
 };
 
 #include "gridplugin.moc"

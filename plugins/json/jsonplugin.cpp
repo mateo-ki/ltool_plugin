@@ -7,6 +7,7 @@
 #include "JsonTool.h"
 
 #include <QObject>
+#include <QPointer>
 #include <QtPlugin>
 
 class JsonPlugin : public QObject, public LToolPlugin
@@ -33,10 +34,11 @@ public:
     bool feedText(const QString& text) override
     {
         if (!m_page)
-            return false;      // 页还没建，宿主先 createPage 再喂
+            return false;      // 页还没建（或已经被宿主那一侧删掉了）：老实说不接，别去碰已释放的对象
         m_page->setText(text);
         return true;
     }
-    JsonTool* m_page = nullptr;
+    // 同 base64 那颗：页的命在宿主手里，裸指针缓存 = 下一次 use-after-free。
+    QPointer<JsonTool> m_page;
 };
 #include "jsonplugin.moc"

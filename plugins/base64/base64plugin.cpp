@@ -7,6 +7,7 @@
 #include "Base64Tool.h"
 
 #include <QObject>
+#include <QPointer>
 #include <QtPlugin>
 
 class Base64Plugin : public QObject, public LToolPlugin
@@ -33,10 +34,12 @@ public:
     bool feedText(const QString& text) override
     {
         if (!m_page)
-            return false;      // 页还没建，宿主先 createPage 再喂
+            return false;      // 页还没建（或已经被宿主那一侧删掉了）：老实说不接，别去碰已释放的对象
         m_page->setText(text);
         return true;
     }
-    Base64Tool* m_page = nullptr;
+    // QPointer 不是修饰：这张页的命在宿主手里（`ToolsPage` 重排卡片墙会把它摘掉那一格 deleteLater），
+    // 裸指针缓存着，下次 feedText 就是一次 use-after-free —— 2026-10-22 他报的「b64 会闪退」。
+    QPointer<Base64Tool> m_page;
 };
 #include "base64plugin.moc"
